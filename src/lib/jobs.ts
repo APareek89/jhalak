@@ -1,0 +1,76 @@
+import { q } from "./db";
+import { polishImage, generateReel } from "./mediaai";
+import { generateProductCopy, reelPrompts, type BusinessBasics } from "./claude";
+import { getMedia, absoluteMediaUrl } from "./media";
+
+/**
+ * In-process async workers. Render runs a persistent Node server, so fire-and-forget
+ * promises keep running after the response is sent; the client polls for status.
+ */
+
+const SUPPORTED_MIMES = new Set(["image/jpeg", "image/png", "image/gif", "image/webp"]);
+
+export function processProductPhoto(
+  productId: string,
+  mediaId: string,
+  biz: BusinessBasics & { id: string; category: string }
+): void {
+  (async () => {
+    try {
+      const media = await getMedia(mediaId);
+      if (!media) throw new Error("media missing");
+      const mime = SUPPORTED_MIMES.has(media.mime) ? media.mime : "image/jpeg";
+      const dataUri = `data:${mime};base64,${media.bytes.toString("base64")}`;
+      const publicUrl = absoluteMediaUrl(mediaId);
+
+      const [polishedUrl, copy] = await Promise.all([
+        polishImage(dataUri, publicUrl, biz.category),
+        generateProductCopy({ mime, base64: media.bytes.toString("base64") }, biz).catch(() => ({
+          title: "New item",
+          description: "",
+          tags: [] as string[],
+        })),
+      ]);
+
+      await q(
+        `update jhalak.products set processed_url=$1, title=$2, description=$3, tags=$4, status='ready' where id=$5`,
+        [polishedUrl || "", copy.title, copy.description, copy.tags, productId]
+      );
+    } catch (e) {
+      await q(`update jhalak.products set status='failed', error=$1 where id=$2`, [
+        e instanceof Error ? e.message : String(e),
+        productId,
+      ]).catch(() => {});
+    }
+  })();
+}
+
+export function generateReelPack(
+  businessId: string,
+  product: { id: string; title: string; description: string; image_media_id: string },
+  biz: BusinessBasics
+): void {
+  const prompts = reelPrompts(product, biz);
+  prompts.forEach(({ variant, prompt }) => {
+    (async () => {
+      const rows = await q<{ id: string }>(
+        `insert into jhalak.reels (business_id, product_id, variant, prompt) values ($1,$2,$3,$4) returning id`,
+        [businessId, product.id, variant, prompt]
+      );
+      const reelId = rows[0].id;
+      try {
+        const media = await getMedia(product.image_media_id);
+        if (!media) throw new Error("image missing");
+        const mime = SUPPORTED_MIMES.has(media.mime) ? media.mime : "image/jpeg";
+        const dataUri = `data:${mime};base64,${media.bytes.toString("base64")}`;
+        const url = await generateReel(dataUri, absoluteMediaUrl(product.image_media_id), prompt);
+        await q(`update jhalak.reels set status='ready', video_url=$1 where id=$2`, [url, reelId]);
+      } catch (e) {
+        await q(`update jhalak.reels set status='failed', error=$1 where id=$2`, [
+          e instanceof Error ? e.message : String(e),
+          reelId,
+        ]).catch(() => {});
+      }
+    })();
+  });
+}
