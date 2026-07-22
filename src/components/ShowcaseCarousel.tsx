@@ -12,8 +12,17 @@ const SAMPLES: Sample[] = [
   { slug: "glow-grace-salon", name: "Glow & Grace Salon", vibe: "Bold · salons & gyms", template: "bold", accent: "violet" },
 ];
 
-/** Live mini preview of a real published Jhalak site (scaled iframe). */
-function SiteMini({ slug }: { slug: string }) {
+/** Live mini preview of a real published Jhalak site (scaled iframe).
+ *  `live=false` renders a light placeholder — the duplicated loop copy must not
+ *  double the server load (8 SSR page loads at once OOM'd the 512MB instance). */
+function SiteMini({ slug, live }: { slug: string; live: boolean }) {
+  if (!live) {
+    return (
+      <div className="w-full h-44 rounded-lg border border-slate-200 bg-gradient-to-br from-slate-100 to-slate-200 flex items-center justify-center">
+        <span className="text-[10px] text-slate-400 font-medium">/s/{slug}</span>
+      </div>
+    );
+  }
   return (
     <div className="relative w-full h-44 rounded-lg overflow-hidden border border-slate-200 bg-white">
       <iframe
@@ -51,7 +60,7 @@ export default function ShowcaseCarousel({
             const isOn = active === key;
             return (
               <div key={s.slug + i} className={`rounded-xl p-2 transition ${isOn ? "ring-2 ring-blue-600 bg-blue-50/50" : "bg-white"}`}>
-                <SiteMini slug={s.slug} />
+                <SiteMini slug={s.slug} live={i < SAMPLES.length} />
                 <div className="flex items-center justify-between mt-2 px-0.5 gap-2">
                   <div className="min-w-0">
                     <p className="text-[11.5px] font-semibold leading-tight truncate">{s.name}</p>
