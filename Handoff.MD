@@ -4,7 +4,7 @@
 > Session rules: update this file before every checkpoint commit & at phase end (snapshot,
 > not journal); re-stamp `last-synced`; over ~40 lines → collapse ✅ into one "Shipped:" line.
 
-last-synced: (set at next commit)
+last-synced: 7adf52b
 
 ## Current state
 - ✅ Shipped (2026-07-22): first cut live at https://jhalak-p178.onrender.com — wizard,
