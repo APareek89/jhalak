@@ -4,7 +4,7 @@
 > Session rules: update this file before every checkpoint commit & at phase end (snapshot,
 > not journal); re-stamp `last-synced`; over ~40 lines → collapse ✅ into one "Shipped:" line.
 
-last-synced: 7adf52b
+last-synced: ea9ad60
 
 ## Current state
 - ✅ Shipped (2026-07-22): first cut live at https://jhalak-p178.onrender.com — wizard,
@@ -13,7 +13,7 @@ last-synced: 7adf52b
   Repo APareek89/jhalak (private) · Render srv-d9g8bsernols73a9m9s0 (Singapore, starter,
   auto-deploy on push) · Supabase Mumbai schema `jhalak` (creds from blindspot .env).
 - Demo tenants: /s/meera-boutique (elegant) · /s/glow-grace-salon (bold).
-- 🔧 In progress this session: FMEA P0 fixes for the HTML-as-JSON bug + 4-tab landing nav
+- ✅ v2 (2026-07-22 pm): catalogue commerce fields · tenant tabs + Our Products (category chips, discount badges, detail modal) + gallery · reference URL/PDF ingestion · Studio chat editor (/studio/[id], Claude tool-loop). 4-tab landing (Home/Website/Catalogue Manager/Social Media Marketing).
   (Home / Website / Catalogue Manager / Social Media Marketing).
 
 ## Pending
