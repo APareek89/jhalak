@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { q } from "@/lib/db";
 
-const PATCHABLE = ["title", "description", "price_text", "visible"];
+const PATCHABLE = ["title", "description", "price_text", "visible", "category", "discount_pct"];
 
 export async function PATCH(req: NextRequest, ctx: { params: Promise<{ pid: string }> }) {
   const { pid } = await ctx.params;

@@ -11,9 +11,12 @@ type Biz = {
 type Content = {
   headline?: string; tagline?: string; about?: string;
   services?: { title: string; desc: string }[]; cta_label?: string;
+  tabs?: { products?: boolean; about?: boolean; gallery?: boolean; contact?: boolean };
+  accent?: string;
 };
 type Product = {
   id: string; title: string; description: string; price_text: string; tags: string[];
+  category: string; discount_pct: number;
   processed_url: string; original_url: string; status: string; visible: boolean; error: string;
 };
 type Reel = {
@@ -167,13 +170,21 @@ export default function Admin({ params }: { params: Promise<{ id: string }> }) {
               {biz.status}
             </span>
           </div>
-          <a
-            href={siteUrl}
-            target="_blank"
-            className="rounded-full bg-stone-900 text-white px-4 py-2 text-sm font-medium hover:bg-stone-700 transition"
-          >
-            View site ↗
-          </a>
+          <div className="flex items-center gap-2">
+            <Link
+              href={`/studio/${id}`}
+              className="rounded-full bg-amber-700 text-white px-4 py-2 text-sm font-medium hover:bg-amber-800 transition"
+            >
+              ✨ Edit in Studio
+            </Link>
+            <a
+              href={siteUrl}
+              target="_blank"
+              className="rounded-full bg-stone-900 text-white px-4 py-2 text-sm font-medium hover:bg-stone-700 transition"
+            >
+              View site ↗
+            </a>
+          </div>
         </div>
         <nav className="max-w-6xl mx-auto px-6 flex gap-1">
           {TABS.map((t) => (
@@ -288,11 +299,26 @@ export default function Admin({ params }: { params: Promise<{ id: string }> }) {
                           className="w-full text-xs text-stone-500 outline-none resize-none border-b border-transparent focus:border-stone-300"
                         />
                         <input
-                          defaultValue={p.price_text}
-                          placeholder="Price (e.g. ₹1,499)"
-                          onBlur={(e) => patchProduct(p.id, { price_text: e.target.value })}
+                          defaultValue={p.category}
+                          placeholder="Category (e.g. Sarees)"
+                          onBlur={(e) => patchProduct(p.id, { category: e.target.value })}
                           className="w-full text-xs outline-none border-b border-transparent focus:border-stone-300"
                         />
+                        <div className="flex gap-2">
+                          <input
+                            defaultValue={p.price_text}
+                            placeholder="Price (₹1,499)"
+                            onBlur={(e) => patchProduct(p.id, { price_text: e.target.value })}
+                            className="flex-1 min-w-0 text-xs outline-none border-b border-transparent focus:border-stone-300"
+                          />
+                          <input
+                            type="number" min={0} max={90}
+                            defaultValue={p.discount_pct || ""}
+                            placeholder="Disc %"
+                            onBlur={(e) => patchProduct(p.id, { discount_pct: Number(e.target.value) || 0 })}
+                            className="w-16 text-xs outline-none border-b border-transparent focus:border-stone-300"
+                          />
+                        </div>
                         <div className="flex justify-between items-center pt-1">
                           <button
                             onClick={() => {
@@ -381,6 +407,48 @@ export default function Admin({ params }: { params: Promise<{ id: string }> }) {
                     {tp}
                   </button>
                 ))}
+              </div>
+            </Field>
+            <Field label="Accent color">
+              <div className="flex gap-2">
+                {[
+                  ["amber", "bg-amber-700"], ["violet", "bg-violet-600"], ["emerald", "bg-emerald-700"],
+                  ["rose", "bg-rose-700"], ["sky", "bg-sky-700"], ["stone", "bg-stone-800"],
+                ].map(([c, cls]) => (
+                  <button
+                    key={c}
+                    title={c}
+                    onClick={() => patchBiz({ content: { ...content, accent: c } }, `Accent → ${c}`)}
+                    className={`w-9 h-9 rounded-full ${cls} transition ring-offset-2 ${
+                      content.accent === c ? "ring-2 ring-stone-900" : "hover:scale-110"
+                    }`}
+                  />
+                ))}
+              </div>
+            </Field>
+            <Field label="Website pages">
+              <div className="flex flex-wrap gap-2">
+                {[
+                  ["products", "Our Products"], ["about", "About"], ["gallery", "Gallery"], ["contact", "Contact"],
+                ].map(([k, label]) => {
+                  const on = { products: true, about: true, gallery: false, contact: true, ...(content.tabs || {}) }[k as "products"];
+                  return (
+                    <button
+                      key={k}
+                      onClick={() =>
+                        patchBiz(
+                          { content: { ...content, tabs: { ...(content.tabs || {}), [k]: !on } } },
+                          `${label} ${on ? "hidden" : "shown"}`
+                        )
+                      }
+                      className={`px-4 py-2 rounded-full text-sm border transition ${
+                        on ? "bg-stone-900 text-white border-stone-900" : "bg-white border-stone-300 hover:border-stone-500"
+                      }`}
+                    >
+                      {on ? "✓ " : ""}{label}
+                    </button>
+                  );
+                })}
               </div>
             </Field>
             <button

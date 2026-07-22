@@ -32,7 +32,8 @@ const LANGUAGE_NOTE: Record<string, string> = {
 /** Generate website copy from the 3-question interview. Tool-forced JSON. */
 export async function generateSiteCopy(
   biz: BusinessBasics,
-  answers: { offering: string; special: string; action: string }
+  answers: { offering: string; special: string; action: string },
+  referenceText?: string
 ): Promise<SiteCopy> {
   const res = await client().messages.create({
     model: MODEL,
@@ -75,7 +76,7 @@ Business: ${biz.name} — a ${biz.category} in ${biz.city || "India"}.
 What they offer: ${answers.offering}
 What makes them special: ${answers.special}
 What they want visitors to do: ${answers.action}
-
+${referenceText ? `\nReference material the owner shared (their old website / brochure — use it for facts, tone and specifics, do NOT copy it verbatim):\n"""${referenceText.slice(0, 4000)}"""\n` : ""}
 ${LANGUAGE_NOTE[biz.language] || LANGUAGE_NOTE.english}
 Premium but warm. No clichés like "one stop shop" or "best in class". No emoji.`,
       },
@@ -90,6 +91,7 @@ export interface ProductCopy {
   title: string;
   description: string;
   tags: string[];
+  category: string;
 }
 
 /** Generate catalogue title/description from the product image (vision, base64). */
@@ -110,8 +112,9 @@ export async function generateProductCopy(
             title: { type: "string", description: "Item name, 2-5 words, specific to what is in the photo" },
             description: { type: "string", description: "1-2 appealing sentences about this item" },
             tags: { type: "array", items: { type: "string" }, description: "3-5 short lowercase tags" },
+            category: { type: "string", description: "ONE short category this item belongs to, e.g. 'Sarees', 'Lehengas', 'Jewellery', 'Hair', 'Skin', 'Interiors'. Title Case, 1-2 words." },
           },
-          required: ["title", "description", "tags"],
+          required: ["title", "description", "tags", "category"],
         },
       },
     ],

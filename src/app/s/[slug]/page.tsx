@@ -1,41 +1,17 @@
-import { q } from "@/lib/db";
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
+import Link from "next/link";
 import LeadForm from "./LeadForm";
+import TenantHeader from "./TenantHeader";
+import { loadTenant, theme, waLink, siteTabs, discounted } from "@/lib/tenant";
 
 export const dynamic = "force-dynamic";
-
-type Biz = {
-  id: string; slug: string; name: string; category: string; city: string;
-  phone: string; whatsapp: string; language: string; template: string; status: string;
-};
-type Content = {
-  headline?: string; tagline?: string; about?: string;
-  services?: { title: string; desc: string }[]; cta_label?: string;
-};
-type Product = {
-  id: string; title: string; description: string; price_text: string;
-  processed_url: string; original_url: string; status: string; visible: boolean;
-};
-
-async function load(slug: string) {
-  const biz = await q<Biz>(`select * from jhalak.businesses where slug=$1`, [slug]);
-  if (!biz.length) return null;
-  const [content, products] = await Promise.all([
-    q<{ content: Content }>(`select content from jhalak.site_content where business_id=$1`, [biz[0].id]),
-    q<Product>(
-      `select * from jhalak.products where business_id=$1 and visible=true and status='ready' order by sort, created_at`,
-      [biz[0].id]
-    ),
-  ]);
-  return { biz: biz[0], content: content[0]?.content || {}, products };
-}
 
 export async function generateMetadata(
   { params }: { params: Promise<{ slug: string }> }
 ): Promise<Metadata> {
   const { slug } = await params;
-  const data = await load(slug);
+  const data = await loadTenant(slug);
   if (!data) return {};
   return {
     title: `${data.biz.name}${data.biz.city ? " · " + data.biz.city : ""}`,
@@ -43,43 +19,17 @@ export async function generateMetadata(
   };
 }
 
-const THEMES = {
-  elegant: {
-    page: "bg-[#faf7f2] text-stone-900",
-    header: "bg-[#faf7f2]/90 border-b border-stone-200",
-    hero: "bg-[#f4efe7]",
-    accentText: "text-amber-800",
-    accentBg: "bg-amber-800 hover:bg-amber-900",
-    card: "bg-white border border-stone-200",
-    display: "font-display",
-    sectionAlt: "bg-white",
-    footer: "bg-[#f4efe7] text-stone-500",
-  },
-  bold: {
-    page: "bg-white text-stone-900",
-    header: "bg-stone-950/95 border-b border-stone-800 text-white",
-    hero: "bg-stone-950 text-white",
-    accentText: "text-violet-600",
-    accentBg: "bg-violet-600 hover:bg-violet-700",
-    card: "bg-white border border-stone-200 shadow-sm",
-    display: "font-sans font-extrabold tracking-tight",
-    sectionAlt: "bg-stone-50",
-    footer: "bg-stone-950 text-stone-400",
-  },
-} as const;
-
-export default async function Site(
-  { params }: { params: Promise<{ slug: string }> }
-) {
+export default async function Site({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
-  const data = await load(slug);
+  const data = await loadTenant(slug);
   if (!data) notFound();
   const { biz, content, products } = data;
-  const t = THEMES[(biz.template as keyof typeof THEMES)] || THEMES.elegant;
-  const wa = (biz.whatsapp || biz.phone || "").replace(/\D/g, "");
-  const waLink = wa ? `https://wa.me/${wa.length === 10 ? "91" + wa : wa}` : "";
+  const t = theme(biz.template, content.accent);
+  const tabs = siteTabs(content);
+  const wa = waLink(biz);
   const heroImg = products[0]?.processed_url || products[0]?.original_url || "";
   const isService = biz.category !== "boutique";
+  const featured = products.slice(0, 3);
 
   return (
     <div className={`min-h-screen ${t.page}`}>
@@ -89,19 +39,11 @@ export default async function Site(
         </div>
       )}
 
-      <header className={`sticky top-0 z-20 backdrop-blur ${t.header}`}>
-        <div className="max-w-5xl mx-auto px-6 py-4 flex items-center justify-between">
-          <span className={`${t.display} text-xl`}>{biz.name}</span>
-          {waLink && (
-            <a
-              href={waLink}
-              className={`rounded-full ${t.accentBg} text-white px-4 py-2 text-sm font-medium transition`}
-            >
-              WhatsApp us
-            </a>
-          )}
-        </div>
-      </header>
+      <TenantHeader
+        slug={slug} name={biz.name} displayClass={t.display} headerClass={t.header}
+        accentBg={t.accentBg} wa={wa}
+        tabs={{ products: tabs.products && products.length > 0, gallery: tabs.gallery && products.length > 0, contact: tabs.contact }}
+      />
 
       <section className={`${t.hero}`}>
         <div className="max-w-5xl mx-auto px-6 py-16 sm:py-24 grid sm:grid-cols-2 gap-10 items-center">
@@ -112,21 +54,13 @@ export default async function Site(
             <h1 className={`${t.display} text-4xl sm:text-5xl leading-tight`}>
               {content.headline || biz.name}
             </h1>
-            {content.tagline && (
-              <p className="mt-4 text-lg opacity-80">{content.tagline}</p>
-            )}
+            {content.tagline && <p className="mt-4 text-lg opacity-80">{content.tagline}</p>}
             <div className="mt-8 flex gap-3">
-              <a
-                href="#contact"
-                className={`rounded-full ${t.accentBg} text-white px-7 py-3.5 font-semibold transition`}
-              >
+              <a href={tabs.contact ? "#contact" : wa || "#"} className={`rounded-full ${t.accentBg} text-white px-7 py-3.5 font-semibold transition`}>
                 {content.cta_label || "Get in touch"}
               </a>
               {biz.phone && (
-                <a
-                  href={`tel:${biz.phone}`}
-                  className="rounded-full border border-current/30 px-7 py-3.5 font-semibold opacity-80 hover:opacity-100 transition"
-                >
+                <a href={`tel:${biz.phone}`} className="rounded-full border border-current/30 px-7 py-3.5 font-semibold opacity-80 hover:opacity-100 transition">
                   Call
                 </a>
               )}
@@ -134,16 +68,12 @@ export default async function Site(
           </div>
           {heroImg && (
             // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={heroImg}
-              alt={biz.name}
-              className="rounded-3xl aspect-square object-cover w-full shadow-2xl"
-            />
+            <img src={heroImg} alt={biz.name} className="rounded-3xl aspect-square object-cover w-full shadow-2xl" />
           )}
         </div>
       </section>
 
-      {content.about && (
+      {tabs.about && content.about && (
         <section className="max-w-5xl mx-auto px-6 py-16">
           <h2 className={`${t.display} text-2xl mb-4`}>About us</h2>
           <p className="max-w-2xl text-lg leading-8 opacity-80">{content.about}</p>
@@ -166,76 +96,78 @@ export default async function Site(
         </section>
       )}
 
-      {!!products.length && (
+      {tabs.products && !!featured.length && (
         <section className="max-w-5xl mx-auto px-6 py-16">
-          <h2 className={`${t.display} text-2xl mb-8`}>
-            {isService ? "Our work & space" : "Our collection"}
-          </h2>
+          <div className="flex items-baseline justify-between mb-8">
+            <h2 className={`${t.display} text-2xl`}>{isService ? "Our work" : "Featured"}</h2>
+            <Link href={`/s/${slug}/products`} className={`text-sm font-semibold ${t.accentText}`}>
+              View all products →
+            </Link>
+          </div>
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-6">
-            {products.map((p) => (
-              <div key={p.id} className={`rounded-2xl overflow-hidden ${t.card}`}>
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src={p.processed_url || p.original_url}
-                  alt={p.title}
-                  className="aspect-square object-cover w-full"
-                />
-                <div className="p-4">
-                  <div className="flex items-baseline justify-between gap-2">
-                    <h3 className="font-medium text-sm">{p.title}</h3>
-                    {p.price_text && (
-                      <span className={`text-sm font-semibold ${t.accentText}`}>{p.price_text}</span>
+            {featured.map((p) => {
+              const price = discounted(p.price_text, p.discount_pct);
+              return (
+                <Link key={p.id} href={`/s/${slug}/products`} className={`rounded-2xl overflow-hidden ${t.card} group`}>
+                  <div className="relative">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={p.processed_url || p.original_url} alt={p.title}
+                      className="aspect-square object-cover w-full group-hover:scale-[1.02] transition" />
+                    {p.discount_pct > 0 && (
+                      <span className="absolute top-3 left-3 rounded-full bg-rose-600 text-white text-xs font-bold px-2.5 py-1">
+                        {p.discount_pct}% OFF
+                      </span>
                     )}
                   </div>
-                  {p.description && (
-                    <p className="text-xs opacity-60 mt-1 line-clamp-2">{p.description}</p>
-                  )}
-                  {waLink && (
-                    <a
-                      href={`${waLink}?text=${encodeURIComponent(`Hi! I'm interested in ${p.title}`)}`}
-                      className={`mt-3 inline-block text-xs font-semibold ${t.accentText}`}
-                    >
-                      Enquire on WhatsApp →
-                    </a>
-                  )}
-                </div>
-              </div>
-            ))}
+                  <div className="p-4">
+                    <h3 className="font-medium text-sm truncate">{p.title}</h3>
+                    {p.price_text && (
+                      <p className="text-sm mt-0.5">
+                        {price.final ? (
+                          <>
+                            <span className={`font-semibold ${t.accentText}`}>{price.final}</span>{" "}
+                            <span className="line-through opacity-50 text-xs">{price.original}</span>
+                          </>
+                        ) : (
+                          <span className={`font-semibold ${t.accentText}`}>{p.price_text}</span>
+                        )}
+                      </p>
+                    )}
+                  </div>
+                </Link>
+              );
+            })}
           </div>
         </section>
       )}
 
-      <section id="contact" className={t.sectionAlt}>
-        <div className="max-w-5xl mx-auto px-6 py-16 grid sm:grid-cols-2 gap-10">
-          <div>
-            <h2 className={`${t.display} text-2xl mb-4`}>Visit or message us</h2>
-            <p className="opacity-70 mb-6">
-              {biz.city && <>📍 {biz.city}<br /></>}
-              {biz.phone && <>📞 {biz.phone}</>}
-            </p>
-            {waLink && (
-              <a
-                href={waLink}
-                className={`inline-block rounded-full ${t.accentBg} text-white px-6 py-3 font-semibold transition`}
-              >
-                Chat on WhatsApp
-              </a>
-            )}
+      {tabs.contact && (
+        <section id="contact" className={t.sectionAlt}>
+          <div className="max-w-5xl mx-auto px-6 py-16 grid sm:grid-cols-2 gap-10">
+            <div>
+              <h2 className={`${t.display} text-2xl mb-4`}>Visit or message us</h2>
+              <p className="opacity-70 mb-6">
+                {biz.city && <>📍 {biz.city}<br /></>}
+                {biz.phone && <>📞 {biz.phone}</>}
+              </p>
+              {wa && (
+                <a href={wa} className={`inline-block rounded-full ${t.accentBg} text-white px-6 py-3 font-semibold transition`}>
+                  Chat on WhatsApp
+                </a>
+              )}
+            </div>
+            <LeadForm slug={biz.slug} accentBg={t.accentBg} />
           </div>
-          <LeadForm slug={biz.slug} accentBg={t.accentBg} />
-        </div>
-      </section>
+        </section>
+      )}
 
       <footer className={`${t.footer} text-center text-xs py-6`}>
         {biz.name} · Made with Jhalak
       </footer>
 
-      {waLink && (
-        <a
-          href={waLink}
-          aria-label="WhatsApp"
-          className="fixed bottom-5 right-5 z-30 w-14 h-14 rounded-full bg-[#25D366] shadow-xl flex items-center justify-center text-2xl hover:scale-105 transition"
-        >
+      {wa && (
+        <a href={wa} aria-label="WhatsApp"
+          className="fixed bottom-5 right-5 z-30 w-14 h-14 rounded-full bg-[#25D366] shadow-xl flex items-center justify-center text-2xl hover:scale-105 transition">
           💬
         </a>
       )}

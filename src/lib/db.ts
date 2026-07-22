@@ -97,6 +97,9 @@ create table if not exists jhalak.media (
   bytes bytea not null,
   created_at timestamptz not null default now()
 );
+
+alter table jhalak.products add column if not exists category text not null default '';
+alter table jhalak.products add column if not exists discount_pct int not null default 0;
 `;
 
 export function ensureSchema(): Promise<void> {

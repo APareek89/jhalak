@@ -29,12 +29,13 @@ export function processProductPhoto(
           title: "New item",
           description: "",
           tags: [] as string[],
+          category: "",
         })),
       ]);
 
       await q(
-        `update jhalak.products set processed_url=$1, title=$2, description=$3, tags=$4, status='ready' where id=$5`,
-        [polishedUrl || "", copy.title, copy.description, copy.tags, productId]
+        `update jhalak.products set processed_url=$1, title=$2, description=$3, tags=$4, category=$5, status='ready' where id=$6`,
+        [polishedUrl || "", copy.title, copy.description, copy.tags, copy.category || "", productId]
       );
     } catch (e) {
       await q(`update jhalak.products set status='failed', error=$1 where id=$2`, [
