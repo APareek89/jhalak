@@ -4,31 +4,30 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 
 export default function TenantHeader({
-  slug, name, displayClass, headerClass, accentBg, wa, tabs,
+  slug, name, logo, displayClass, headerClass, accentBg, wa, items,
 }: {
-  slug: string; name: string; displayClass: string; headerClass: string;
+  slug: string; name: string; logo?: string; displayClass: string; headerClass: string;
   accentBg: string; wa: string;
-  tabs: { products: boolean; gallery: boolean; contact: boolean };
+  items: { href: string; label: string }[];
 }) {
   const path = usePathname();
   const base = `/s/${slug}`;
-  const items = [
-    { href: base, label: "Home", show: true },
-    { href: `${base}/products`, label: "Our Products", show: tabs.products },
-    { href: `${base}/gallery`, label: "Gallery", show: tabs.gallery },
-    { href: `${base}#contact`, label: "Contact", show: tabs.contact },
-  ].filter((i) => i.show);
-
   return (
     <header className={`sticky top-0 z-20 backdrop-blur ${headerClass}`}>
-      <div className="max-w-5xl mx-auto px-6 py-4 flex items-center justify-between gap-3">
-        <Link href={base} className={`${displayClass} text-xl shrink-0`}>{name}</Link>
+      <div className="max-w-5xl mx-auto px-6 py-3.5 flex items-center justify-between gap-3">
+        <Link href={base} className={`${displayClass} text-xl shrink-0 flex items-center gap-2.5`}>
+          {logo && (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={logo} alt="" className="h-9 w-9 rounded-lg object-contain bg-white/60" />
+          )}
+          {name}
+        </Link>
         <div className="flex items-center gap-1 overflow-x-auto">
           {items.map((i) => {
             const active = path === i.href;
             return (
               <Link
-                key={i.label}
+                key={i.href + i.label}
                 href={i.href}
                 className={`shrink-0 px-3 py-1.5 rounded-full text-sm transition ${
                   active ? "font-semibold underline underline-offset-8" : "opacity-75 hover:opacity-100"

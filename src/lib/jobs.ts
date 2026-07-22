@@ -49,9 +49,10 @@ export function processProductPhoto(
 export function generateReelPack(
   businessId: string,
   product: { id: string; title: string; description: string; image_media_id: string },
-  biz: BusinessBasics
+  biz: BusinessBasics,
+  brief?: string
 ): void {
-  const prompts = reelPrompts(product, biz);
+  const prompts = reelPrompts(product, biz, brief);
   prompts.forEach(({ variant, prompt }) => {
     (async () => {
       const rows = await q<{ id: string }>(

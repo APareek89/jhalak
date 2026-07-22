@@ -2,33 +2,68 @@
 
 import { use, useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
+import {
+  LayoutDashboard, Package, Globe, Clapperboard, Inbox, Check, Pencil, Plus, X,
+  Upload, Sparkles, Save, ImagePlus, Trash2, Eye, EyeOff, Lightbulb, Wand2,
+  ExternalLink, Copy as CopyIcon, MessageCircle, ChevronDown, ChevronUp, Palette, Type,
+} from "lucide-react";
 import { fetchJson, downscaleImage } from "@/lib/client";
 
 type Biz = {
   id: string; slug: string; name: string; category: string; city: string;
   phone: string; whatsapp: string; language: string; template: string; status: string;
+  logo_url: string;
 };
+type Tab = { key: string; label: string; enabled: boolean; builtin: boolean; text: boolean };
 type Content = {
   headline?: string; tagline?: string; about?: string;
   services?: { title: string; desc: string }[]; cta_label?: string;
-  tabs?: { products?: boolean; about?: boolean; gallery?: boolean; contact?: boolean };
-  accent?: string;
+  tabs_config?: Tab[]; pages?: Record<string, string>;
+  accent?: string; font?: string;
+  tabs?: Record<string, boolean>;
 };
 type Product = {
   id: string; title: string; description: string; price_text: string; tags: string[];
   category: string; discount_pct: number;
   processed_url: string; original_url: string; status: string; visible: boolean; error: string;
 };
-type Reel = {
-  id: string; product_id: string; variant: string; video_url: string; status: string; error: string;
-};
+type Reel = { id: string; product_id: string; variant: string; video_url: string; status: string; error: string };
 type Lead = { id: string; name: string; phone: string; message: string; created_at: string };
+type Idea = { title: string; hook: string; description: string; source: string };
 
-const TABS = ["Overview", "Catalogue", "Website", "Reels", "Leads"] as const;
+const NAV = [
+  { id: "Overview", icon: LayoutDashboard },
+  { id: "Catalogue", icon: Package },
+  { id: "Website", icon: Globe },
+  { id: "Reels", icon: Clapperboard },
+  { id: "Leads", icon: Inbox },
+] as const;
+
+const DEFAULT_TABS: Tab[] = [
+  { key: "products", label: "Our Products", enabled: true, builtin: true, text: false },
+  { key: "about", label: "About Us", enabled: true, builtin: true, text: false },
+  { key: "gallery", label: "Gallery", enabled: false, builtin: true, text: false },
+  { key: "contact", label: "Contact", enabled: true, builtin: true, text: false },
+  { key: "pricing", label: "Pricing", enabled: false, builtin: true, text: true },
+  { key: "terms", label: "Terms & Conditions", enabled: false, builtin: true, text: true },
+  { key: "faq", label: "FAQ", enabled: false, builtin: true, text: true },
+];
+
+function resolveTabs(content: Content): Tab[] {
+  const saved = content.tabs_config;
+  if (saved?.length) {
+    const byKey = new Map(saved.map((t) => [t.key, t]));
+    const out = DEFAULT_TABS.map((d) => ({ ...d, ...(byKey.get(d.key) || {}) }));
+    saved.forEach((s) => { if (!DEFAULT_TABS.some((d) => d.key === s.key)) out.push(s); });
+    return out;
+  }
+  const legacy = content.tabs || {};
+  return DEFAULT_TABS.map((d) => ({ ...d, enabled: legacy[d.key] !== undefined ? !!legacy[d.key] : d.enabled }));
+}
 
 export default function Admin({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
-  const [tab, setTab] = useState<(typeof TABS)[number]>("Overview");
+  const [tab, setTab] = useState<(typeof NAV)[number]["id"]>("Overview");
   const [biz, setBiz] = useState<Biz | null>(null);
   const [content, setContent] = useState<Content>({});
   const [products, setProducts] = useState<Product[]>([]);
@@ -38,8 +73,26 @@ export default function Admin({ params }: { params: Promise<{ id: string }> }) {
   const [leadsCount, setLeadsCount] = useState(0);
   const [mediaProvider, setMediaProvider] = useState("off");
   const [toast, setToast] = useState("");
-  const fileRef = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState(false);
+  const fileRef = useRef<HTMLInputElement>(null);
+  const logoRef = useRef<HTMLInputElement>(null);
+
+  // catalogue drafts
+  const [drafts, setDrafts] = useState<Record<string, Partial<Product>>>({});
+  const [savedIds, setSavedIds] = useState<Set<string>>(new Set());
+  // website editor
+  const [siteTabs, setSiteTabs] = useState<Tab[]>(DEFAULT_TABS);
+  const [pages, setPages] = useState<Record<string, string>>({});
+  const [editingTab, setEditingTab] = useState<string | null>(null);
+  const [expandedPage, setExpandedPage] = useState<string | null>(null);
+  const [addingTab, setAddingTab] = useState(false);
+  const [newTabName, setNewTabName] = useState("");
+  // reels
+  const [ideas, setIdeas] = useState<Idea[] | null>(null);
+  const [ideasBusy, setIdeasBusy] = useState(false);
+  const [selectedIdea, setSelectedIdea] = useState<number | null>(null);
+  const [reelProduct, setReelProduct] = useState<string | null>(null);
+  const [brief, setBrief] = useState("");
 
   const refresh = useCallback(async () => {
     const r = await fetchJson<{
@@ -47,10 +100,12 @@ export default function Admin({ params }: { params: Promise<{ id: string }> }) {
       quota: { reel_packs_used: number; photos_used: number };
       leads_count: number; media_provider: string;
     }>(`/api/business/${id}`);
-    if (!r.ok || !r.data) return; // transient failure — next poll retries
+    if (!r.ok || !r.data) return;
     const d = r.data;
     setBiz(d.business);
     setContent(d.content || {});
+    setSiteTabs(resolveTabs(d.content || {}));
+    setPages((d.content || {}).pages || {});
     setProducts(d.products || []);
     setReels(d.reels || []);
     setQuota(d.quota);
@@ -58,16 +113,11 @@ export default function Admin({ params }: { params: Promise<{ id: string }> }) {
     setMediaProvider(d.media_provider || "off");
   }, [id]);
 
-  useEffect(() => {
-    refresh();
-  }, [refresh]);
+  useEffect(() => { refresh(); }, [refresh]);
 
-  // poll while anything is generating
   useEffect(() => {
-    const anyWorking =
-      products.some((p) => p.status === "processing") ||
-      reels.some((r) => r.status === "generating");
-    if (!anyWorking) return;
+    const working = products.some((p) => p.status === "processing") || reels.some((r) => r.status === "generating");
+    if (!working) return;
     const t = setInterval(refresh, 4000);
     return () => clearInterval(t);
   }, [products, reels, refresh]);
@@ -80,33 +130,29 @@ export default function Admin({ params }: { params: Promise<{ id: string }> }) {
     }
   }, [tab, id]);
 
-  const flash = (m: string) => {
-    setToast(m);
-    setTimeout(() => setToast(""), 2500);
-  };
+  const flash = (m: string) => { setToast(m); setTimeout(() => setToast(""), 2500); };
 
   const patchBiz = async (body: Record<string, unknown>, msg = "Saved") => {
-    await fetch(`/api/business/${id}`, {
+    const r = await fetchJson(`/api/business/${id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
     });
+    flash(r.ok ? msg : r.error);
     await refresh();
-    flash(msg);
   };
 
-  const patchProduct = async (pid: string, body: Record<string, unknown>) => {
-    await fetch(`/api/products/${pid}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
-    });
-  };
+  const saveContent = (patch: Partial<Content>, msg = "Saved") =>
+    patchBiz({ content: { ...content, tabs_config: siteTabs, pages, ...patch } }, msg);
 
-  const deleteProduct = async (pid: string) => {
-    await fetch(`/api/products/${pid}`, { method: "DELETE" });
+  const uploadLogo = async (files: FileList | null) => {
+    if (!files?.[0]) return;
+    const fd = new FormData();
+    fd.append("file", files[0]);
+    const r = await fetchJson(`/api/business/${id}/logo`, { method: "POST", body: fd });
+    flash(r.ok ? "Logo updated" : r.error);
+    if (logoRef.current) logoRef.current.value = "";
     await refresh();
-    flash("Removed");
   };
 
   const uploadPhotos = async (files: FileList | null) => {
@@ -129,79 +175,111 @@ export default function Admin({ params }: { params: Promise<{ id: string }> }) {
     await refresh();
   };
 
-  const makeReels = async (productId: string) => {
+  const draft = (p: Product): Product => ({ ...p, ...(drafts[p.id] || {}) });
+  const setDraft = (pid: string, field: string, value: unknown) => {
+    setDrafts((d) => ({ ...d, [pid]: { ...(d[pid] || {}), [field]: value } }));
+    setSavedIds((s) => { const n = new Set(s); n.delete(pid); return n; });
+  };
+  const saveProduct = async (pid: string) => {
+    const d = drafts[pid];
+    if (!d) { setSavedIds((s) => new Set(s).add(pid)); return; }
+    const r = await fetchJson(`/api/products/${pid}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(d),
+    });
+    if (r.ok) { setSavedIds((s) => new Set(s).add(pid)); flash("Product saved"); await refresh(); }
+    else flash(r.error);
+  };
+  const deleteProduct = async (pid: string) => {
+    await fetchJson(`/api/products/${pid}`, { method: "DELETE" });
+    await refresh();
+    flash("Removed");
+  };
+
+  const getInspiration = async () => {
+    setIdeasBusy(true);
+    setIdeas(null);
+    const r = await fetchJson<{ ideas: Idea[] }>(`/api/business/${id}/inspiration`, { method: "POST" });
+    setIdeasBusy(false);
+    if (r.ok && r.data) setIdeas(r.data.ideas);
+    else flash(r.error);
+  };
+
+  const selectIdea = (i: number) => {
+    setSelectedIdea(i);
+    if (ideas?.[i]) setBrief(`${ideas[i].hook} — ${ideas[i].description}`);
+  };
+
+  const makeReels = async () => {
+    if (!reelProduct) return;
     setBusy(true);
     const r = await fetchJson(`/api/business/${id}/reels`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ product_id: productId }),
+      body: JSON.stringify({ product_id: reelProduct, brief }),
     });
     setBusy(false);
-    flash(r.ok ? "Generating 2 reels — takes a few minutes" : r.error);
+    flash(r.ok ? "Generating 2 reels — a few minutes" : r.error);
+    if (r.ok) { setReelProduct(null); setBrief(""); setSelectedIdea(null); }
     await refresh();
   };
 
+  const addCustomTab = () => {
+    const label = newTabName.trim();
+    if (!label) return;
+    const key = "custom-" + label.toLowerCase().replace(/[^a-z0-9]+/g, "-").slice(0, 24);
+    if (siteTabs.some((t) => t.key === key)) return flash("That tab already exists");
+    setSiteTabs([...siteTabs, { key, label, enabled: true, builtin: false, text: true }]);
+    setNewTabName("");
+    setAddingTab(false);
+  };
+
   if (!biz) {
-    return (
-      <div className="min-h-screen flex items-center justify-center text-stone-400">
-        Loading…
-      </div>
-    );
+    return <div className="min-h-screen flex items-center justify-center text-slate-400">Loading…</div>;
   }
 
   const siteUrl = `/s/${biz.slug}`;
   const readyProducts = products.filter((p) => p.status === "ready");
+  const packsLeft = 2 - quota.reel_packs_used;
 
   return (
-    <div className="min-h-screen bg-stone-100">
-      <header className="bg-white border-b border-stone-200 sticky top-0 z-20">
-        <div className="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <Link href="/" className="font-display text-lg font-semibold">Jhalak</Link>
-            <span className="text-stone-300">/</span>
-            <span className="font-medium">{biz.name}</span>
-            <span
-              className={`text-xs px-2 py-0.5 rounded-full ${
-                biz.status === "published"
-                  ? "bg-green-100 text-green-700"
-                  : "bg-amber-100 text-amber-700"
-              }`}
-            >
+    <div className="min-h-screen bg-slate-50">
+      <header className="bg-white border-b border-slate-200 sticky top-0 z-20">
+        <div className="max-w-6xl mx-auto px-5 py-3 flex items-center justify-between">
+          <div className="flex items-center gap-2.5 min-w-0">
+            <Link href="/" className="font-display text-lg font-semibold shrink-0">Jhalak</Link>
+            <span className="text-slate-300">/</span>
+            {biz.logo_url && (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={biz.logo_url} alt="" className="w-7 h-7 rounded-md object-contain border border-slate-200" />
+            )}
+            <span className="font-semibold truncate">{biz.name}</span>
+            <span className={`text-xs px-2 py-0.5 rounded-full shrink-0 ${
+              biz.status === "published" ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700"
+            }`}>
               {biz.status}
             </span>
           </div>
-          <div className="flex items-center gap-2">
-            <Link
-              href={`/studio/${id}`}
-              className="rounded-full bg-amber-700 text-white px-4 py-2 text-sm font-medium hover:bg-amber-800 transition"
-            >
-              ✨ Edit in Studio
+          <div className="flex items-center gap-2 shrink-0">
+            <Link href={`/studio/${id}`} className="btn-primary !py-2 !text-xs">
+              <Wand2 size={14} /> Studio
             </Link>
-            <a
-              href={siteUrl}
-              target="_blank"
-              className="rounded-full bg-stone-900 text-white px-4 py-2 text-sm font-medium hover:bg-stone-700 transition"
-            >
-              View site ↗
+            <a href={siteUrl} target="_blank" className="btn-secondary !py-2 !text-xs">
+              <ExternalLink size={13} /> View site
             </a>
           </div>
         </div>
-        <nav className="max-w-6xl mx-auto px-6 flex gap-1">
-          {TABS.map((t) => (
-            <button
-              key={t}
-              onClick={() => setTab(t)}
-              className={`px-4 py-2.5 text-sm font-medium border-b-2 transition ${
-                tab === t
-                  ? "border-amber-700 text-amber-800"
-                  : "border-transparent text-stone-500 hover:text-stone-800"
-              }`}
-            >
+        <nav className="max-w-6xl mx-auto px-5 flex gap-0.5 overflow-x-auto">
+          {NAV.map(({ id: t, icon: Icon }) => (
+            <button key={t} onClick={() => setTab(t)}
+              className={`flex items-center gap-1.5 px-3.5 py-2.5 text-sm font-medium border-b-2 cursor-pointer transition ${
+                tab === t ? "border-blue-600 text-blue-700" : "border-transparent text-slate-500 hover:text-slate-800"
+              }`}>
+              <Icon size={15} />
               {t}
               {t === "Leads" && leadsCount > 0 && (
-                <span className="ml-1.5 text-xs bg-amber-700 text-white rounded-full px-1.5 py-0.5">
-                  {leadsCount}
-                </span>
+                <span className="text-[11px] bg-blue-600 text-white rounded-full px-1.5 py-0.5">{leadsCount}</span>
               )}
             </button>
           ))}
@@ -209,354 +287,436 @@ export default function Admin({ params }: { params: Promise<{ id: string }> }) {
       </header>
 
       {toast && (
-        <div className="fixed top-20 right-6 z-50 bg-stone-900 text-white text-sm px-4 py-2.5 rounded-xl shadow-lg">
+        <div className="fixed top-24 right-5 z-50 bg-slate-900 text-white text-sm px-4 py-2.5 rounded-xl shadow-lg">
           {toast}
         </div>
       )}
 
-      <main className="max-w-6xl mx-auto px-6 py-8">
+      <main className="max-w-6xl mx-auto px-5 py-6 space-y-5">
         {tab === "Overview" && (
-          <div className="grid sm:grid-cols-3 gap-5">
-            <Stat label="Catalogue items" value={String(readyProducts.length)} />
-            <Stat label="Enquiries" value={String(leadsCount)} />
-            <Stat label="Reels created" value={String(reels.filter((r) => r.status === "ready").length)} />
-            <div className="sm:col-span-3 rounded-2xl bg-white border border-stone-200 p-6">
-              <p className="font-semibold mb-2">Your website</p>
-              <a href={siteUrl} target="_blank" className="text-amber-700 underline underline-offset-4 text-sm">
-                {typeof window !== "undefined" ? window.location.host : ""}{siteUrl} ↗
+          <>
+            <div className="grid sm:grid-cols-3 gap-4">
+              <Stat icon={Package} label="Catalogue items" value={String(readyProducts.length)} />
+              <Stat icon={Inbox} label="Enquiries" value={String(leadsCount)} />
+              <Stat icon={Clapperboard} label="Reels created" value={String(reels.filter((r) => r.status === "ready").length)} />
+            </div>
+            <div className="card p-5">
+              <p className="font-semibold mb-1.5 text-sm">Your website</p>
+              <a href={siteUrl} target="_blank" className="text-blue-600 text-sm underline underline-offset-4">
+                {typeof window !== "undefined" ? window.location.host : ""}{siteUrl}
               </a>
-              <div className="mt-4 flex gap-3">
+              <div className="mt-4 flex gap-2">
                 {biz.status !== "published" ? (
-                  <button
-                    onClick={() => patchBiz({ status: "published" }, "Published!")}
-                    className="rounded-full bg-amber-700 text-white px-5 py-2.5 text-sm font-semibold hover:bg-amber-800 transition"
-                  >
-                    🚀 Publish
+                  <button onClick={() => patchBiz({ status: "published" }, "Published!")} className="btn-primary !py-2 !text-xs">
+                    Publish
                   </button>
                 ) : (
-                  <button
-                    onClick={() => patchBiz({ status: "draft" }, "Unpublished")}
-                    className="rounded-full border border-stone-300 px-5 py-2.5 text-sm hover:border-stone-500 transition"
-                  >
+                  <button onClick={() => patchBiz({ status: "draft" }, "Unpublished")} className="btn-secondary !py-2 !text-xs">
                     Unpublish
                   </button>
                 )}
                 <button
-                  onClick={() => {
-                    navigator.clipboard.writeText(window.location.origin + siteUrl);
-                    flash("Link copied");
-                  }}
-                  className="rounded-full border border-stone-300 px-5 py-2.5 text-sm hover:border-stone-500 transition"
-                >
-                  Copy link
+                  onClick={() => { navigator.clipboard.writeText(window.location.origin + siteUrl); flash("Link copied"); }}
+                  className="btn-secondary !py-2 !text-xs">
+                  <CopyIcon size={13} /> Copy link
                 </button>
               </div>
             </div>
-          </div>
+          </>
         )}
 
         {tab === "Catalogue" && (
-          <div className="space-y-6">
+          <>
             <div className="flex items-center justify-between">
-              <p className="text-sm text-stone-500">
-                {quota.photos_used}/12 photos used · AI polishes each photo and writes its copy
-              </p>
-              <input
-                ref={fileRef} type="file" accept="image/*" multiple className="hidden"
-                onChange={(e) => uploadPhotos(e.target.files)}
-              />
-              <button
-                onClick={() => fileRef.current?.click()}
-                disabled={busy}
-                className="rounded-full bg-amber-700 text-white px-5 py-2.5 text-sm font-semibold hover:bg-amber-800 transition disabled:opacity-60"
-              >
-                {busy ? "Uploading…" : "＋ Add photos"}
+              <p className="text-sm text-slate-500">{quota.photos_used}/12 photos · edit details and press <b>Save</b></p>
+              <input ref={fileRef} type="file" accept="image/*" multiple className="hidden"
+                onChange={(e) => uploadPhotos(e.target.files)} />
+              <button onClick={() => fileRef.current?.click()} disabled={busy} className="btn-primary !py-2 !text-xs">
+                <ImagePlus size={14} /> {busy ? "Uploading…" : "Add photos"}
               </button>
             </div>
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-5">
-              {products.map((p) => (
-                <div key={p.id} className="rounded-2xl bg-white border border-stone-200 overflow-hidden">
-                  {p.status === "processing" ? (
-                    <div className="aspect-square shimmer" />
-                  ) : (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img src={p.processed_url || p.original_url} alt={p.title} className="aspect-square object-cover w-full" />
-                  )}
-                  <div className="p-4 space-y-2">
-                    {p.status === "processing" ? (
-                      <p className="text-xs text-stone-400">✨ Polishing & writing…</p>
+            <div className="grid sm:grid-cols-2 gap-4">
+              {products.map((p0) => {
+                const p = draft(p0);
+                const saved = savedIds.has(p.id);
+                const dirty = !!drafts[p.id] && !saved;
+                return (
+                  <div key={p.id} className="card overflow-hidden flex">
+                    {p0.status === "processing" ? (
+                      <div className="w-28 shrink-0 shimmer" />
                     ) : (
-                      <>
-                        <input
-                          defaultValue={p.title}
-                          onBlur={(e) => patchProduct(p.id, { title: e.target.value })}
-                          className="w-full text-sm font-medium outline-none border-b border-transparent focus:border-stone-300"
-                        />
-                        <textarea
-                          defaultValue={p.description}
-                          rows={2}
-                          onBlur={(e) => patchProduct(p.id, { description: e.target.value })}
-                          className="w-full text-xs text-stone-500 outline-none resize-none border-b border-transparent focus:border-stone-300"
-                        />
-                        <input
-                          defaultValue={p.category}
-                          placeholder="Category (e.g. Sarees)"
-                          onBlur={(e) => patchProduct(p.id, { category: e.target.value })}
-                          className="w-full text-xs outline-none border-b border-transparent focus:border-stone-300"
-                        />
-                        <div className="flex gap-2">
-                          <input
-                            defaultValue={p.price_text}
-                            placeholder="Price (₹1,499)"
-                            onBlur={(e) => patchProduct(p.id, { price_text: e.target.value })}
-                            className="flex-1 min-w-0 text-xs outline-none border-b border-transparent focus:border-stone-300"
-                          />
-                          <input
-                            type="number" min={0} max={90}
-                            defaultValue={p.discount_pct || ""}
-                            placeholder="Disc %"
-                            onBlur={(e) => patchProduct(p.id, { discount_pct: Number(e.target.value) || 0 })}
-                            className="w-16 text-xs outline-none border-b border-transparent focus:border-stone-300"
-                          />
-                        </div>
-                        <div className="flex justify-between items-center pt-1">
-                          <button
-                            onClick={() => {
-                              patchProduct(p.id, { visible: !p.visible }).then(refresh);
-                            }}
-                            className={`text-xs ${p.visible ? "text-green-700" : "text-stone-400"}`}
-                          >
-                            {p.visible ? "● Visible" : "○ Hidden"}
-                          </button>
-                          <button onClick={() => deleteProduct(p.id)} className="text-xs text-red-500">
-                            Delete
-                          </button>
-                        </div>
-                      </>
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={p0.processed_url || p0.original_url} alt={p.title} className="w-28 shrink-0 object-cover" />
                     )}
+                    <div className="p-3.5 flex-1 min-w-0">
+                      {p0.status === "processing" ? (
+                        <p className="text-xs text-slate-400 flex items-center gap-1.5 mt-2">
+                          <Sparkles size={13} /> Polishing & writing…
+                        </p>
+                      ) : (
+                        <div className="grid grid-cols-2 gap-x-2.5 gap-y-2">
+                          <div className="col-span-2">
+                            <label className="field-label !mb-0.5">Name</label>
+                            <input value={p.title} onChange={(e) => setDraft(p.id, "title", e.target.value)} className="inp !py-1 !text-sm" />
+                          </div>
+                          <div>
+                            <label className="field-label !mb-0.5">Category</label>
+                            <input value={p.category} onChange={(e) => setDraft(p.id, "category", e.target.value)} className="inp !py-1 !text-sm" />
+                          </div>
+                          <div className="flex gap-2">
+                            <div className="flex-1">
+                              <label className="field-label !mb-0.5">Price</label>
+                              <input value={p.price_text} placeholder="₹1,499" onChange={(e) => setDraft(p.id, "price_text", e.target.value)} className="inp !py-1 !text-sm" />
+                            </div>
+                            <div className="w-16">
+                              <label className="field-label !mb-0.5">Disc%</label>
+                              <input type="number" min={0} max={90} value={p.discount_pct || ""} onChange={(e) => setDraft(p.id, "discount_pct", Number(e.target.value) || 0)} className="inp !py-1 !text-sm" />
+                            </div>
+                          </div>
+                          <div className="col-span-2">
+                            <label className="field-label !mb-0.5">Description</label>
+                            <textarea value={p.description} rows={2} onChange={(e) => setDraft(p.id, "description", e.target.value)} className="inp !py-1 !text-sm" />
+                          </div>
+                          <div className="col-span-2 flex items-center justify-between pt-0.5">
+                            <div className="flex items-center gap-2.5">
+                              <button
+                                onClick={() => fetchJson(`/api/products/${p.id}`, {
+                                  method: "PATCH",
+                                  headers: { "Content-Type": "application/json" },
+                                  body: JSON.stringify({ visible: !p0.visible }),
+                                }).then(refresh)}
+                                className={`flex items-center gap-1 text-xs cursor-pointer ${p0.visible ? "text-emerald-600" : "text-slate-400"}`}>
+                                {p0.visible ? <Eye size={13} /> : <EyeOff size={13} />}
+                                {p0.visible ? "Visible" : "Hidden"}
+                              </button>
+                              <button onClick={() => deleteProduct(p.id)} className="flex items-center gap-1 text-xs text-red-500 cursor-pointer">
+                                <Trash2 size={13} /> Delete
+                              </button>
+                            </div>
+                            <button onClick={() => saveProduct(p.id)}
+                              className={saved && !dirty ? "btn-secondary !py-1 !px-3 !text-xs" : "btn-primary !py-1 !px-3 !text-xs"}>
+                              {saved && !dirty ? (<><Check size={12} /> Saved</>) : (<><Save size={12} /> Save</>)}
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
               {!products.length && (
-                <p className="col-span-full text-center text-stone-400 py-16">
-                  No photos yet — add your first ones.
-                </p>
+                <p className="col-span-full text-center text-slate-400 py-14">No photos yet — add your first ones.</p>
               )}
             </div>
-          </div>
+          </>
         )}
 
         {tab === "Website" && (
-          <div className="max-w-2xl space-y-5">
-            <Field label="Headline">
-              <input
-                value={content.headline || ""}
-                onChange={(e) => setContent({ ...content, headline: e.target.value })}
-                className="adm-inp font-display text-lg"
-              />
-            </Field>
-            <Field label="Tagline">
-              <input
-                value={content.tagline || ""}
-                onChange={(e) => setContent({ ...content, tagline: e.target.value })}
-                className="adm-inp"
-              />
-            </Field>
-            <Field label="About">
-              <textarea
-                value={content.about || ""}
-                onChange={(e) => setContent({ ...content, about: e.target.value })}
-                rows={3}
-                className="adm-inp"
-              />
-            </Field>
-            {(content.services || []).map((s, i) => (
-              <div key={i} className="grid grid-cols-3 gap-3">
-                <input
-                  value={s.title}
-                  onChange={(e) => {
-                    const services = [...(content.services || [])];
-                    services[i] = { ...s, title: e.target.value };
-                    setContent({ ...content, services });
-                  }}
-                  className="adm-inp col-span-1"
-                />
-                <input
-                  value={s.desc}
-                  onChange={(e) => {
-                    const services = [...(content.services || [])];
-                    services[i] = { ...s, desc: e.target.value };
-                    setContent({ ...content, services });
-                  }}
-                  className="adm-inp col-span-2"
-                />
+          <div className="max-w-3xl space-y-4">
+            {/* Branding */}
+            <Section icon={Palette} title="Branding" subtitle="Logo, template, colors & font">
+              <div className="flex items-center gap-4 mb-4">
+                <input ref={logoRef} type="file" accept="image/*" className="hidden" onChange={(e) => uploadLogo(e.target.files)} />
+                {biz.logo_url ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={biz.logo_url} alt="logo" className="w-12 h-12 rounded-lg object-contain border border-slate-200" />
+                ) : (
+                  <div className="w-12 h-12 rounded-lg border-2 border-dashed border-slate-300 flex items-center justify-center text-slate-300">
+                    <ImagePlus size={17} />
+                  </div>
+                )}
+                <button onClick={() => logoRef.current?.click()} className="btn-secondary !py-1.5 !text-xs">
+                  <Upload size={13} /> {biz.logo_url ? "Change logo" : "Upload logo"}
+                </button>
+                {biz.logo_url && (
+                  <button onClick={() => fetchJson(`/api/business/${id}/logo`, { method: "DELETE" }).then(refresh)}
+                    className="text-xs text-red-500 cursor-pointer">Remove</button>
+                )}
               </div>
-            ))}
-            <Field label="Template">
-              <div className="flex gap-2">
-                {["elegant", "bold"].map((tp) => (
-                  <button
-                    key={tp}
-                    onClick={() => patchBiz({ template: tp }, "Template changed")}
-                    className={`px-4 py-2 rounded-full text-sm border capitalize transition ${
-                      biz.template === tp
-                        ? "bg-stone-900 text-white border-stone-900"
-                        : "bg-white border-stone-300 hover:border-stone-500"
-                    }`}
-                  >
+              <label className="field-label">Template</label>
+              <div className="flex flex-wrap gap-2 mb-4">
+                {["elegant", "bold", "professional", "minimal"].map((tp) => (
+                  <button key={tp} onClick={() => patchBiz({ template: tp }, "Template changed")}
+                    className={`px-3.5 py-1.5 rounded-lg text-sm border capitalize cursor-pointer transition ${
+                      biz.template === tp ? "bg-blue-600 text-white border-blue-600" : "bg-white border-slate-300 hover:border-blue-400"
+                    }`}>
                     {tp}
                   </button>
                 ))}
               </div>
-            </Field>
-            <Field label="Accent color">
-              <div className="flex gap-2">
-                {[
-                  ["amber", "bg-amber-700"], ["violet", "bg-violet-600"], ["emerald", "bg-emerald-700"],
-                  ["rose", "bg-rose-700"], ["sky", "bg-sky-700"], ["stone", "bg-stone-800"],
-                ].map(([c, cls]) => (
-                  <button
-                    key={c}
-                    title={c}
-                    onClick={() => patchBiz({ content: { ...content, accent: c } }, `Accent → ${c}`)}
-                    className={`w-9 h-9 rounded-full ${cls} transition ring-offset-2 ${
-                      content.accent === c ? "ring-2 ring-stone-900" : "hover:scale-110"
-                    }`}
-                  />
+              <label className="field-label">Accent color</label>
+              <div className="flex gap-2 mb-4">
+                {[["blue", "bg-blue-600"], ["amber", "bg-amber-700"], ["violet", "bg-violet-600"],
+                  ["emerald", "bg-emerald-700"], ["rose", "bg-rose-700"], ["sky", "bg-sky-700"], ["stone", "bg-stone-800"]].map(([c, cls]) => (
+                  <button key={c} title={c} onClick={() => saveContent({ accent: c }, `Accent → ${c}`)}
+                    className={`w-8 h-8 rounded-full ${cls} cursor-pointer transition ring-offset-2 ${
+                      content.accent === c ? "ring-2 ring-slate-900" : "hover:scale-110"
+                    }`} />
                 ))}
               </div>
-            </Field>
-            <Field label="Website pages">
-              <div className="flex flex-wrap gap-2">
-                {[
-                  ["products", "Our Products"], ["about", "About"], ["gallery", "Gallery"], ["contact", "Contact"],
-                ].map(([k, label]) => {
-                  const on = { products: true, about: true, gallery: false, contact: true, ...(content.tabs || {}) }[k as "products"];
-                  return (
-                    <button
-                      key={k}
-                      onClick={() =>
-                        patchBiz(
-                          { content: { ...content, tabs: { ...(content.tabs || {}), [k]: !on } } },
-                          `${label} ${on ? "hidden" : "shown"}`
-                        )
-                      }
-                      className={`px-4 py-2 rounded-full text-sm border transition ${
-                        on ? "bg-stone-900 text-white border-stone-900" : "bg-white border-stone-300 hover:border-stone-500"
-                      }`}
-                    >
-                      {on ? "✓ " : ""}{label}
-                    </button>
-                  );
-                })}
+              <label className="field-label flex items-center gap-1"><Type size={12} /> Heading font</label>
+              <div className="flex gap-2">
+                {[["serif", "Classic serif"], ["sans", "Modern sans"], ["strong", "Strong caps"]].map(([f, label]) => (
+                  <button key={f} onClick={() => saveContent({ font: f }, `Font → ${label}`)}
+                    className={`px-3.5 py-1.5 rounded-lg text-sm border cursor-pointer transition ${
+                      (content.font || "") === f ? "bg-blue-600 text-white border-blue-600" : "bg-white border-slate-300 hover:border-blue-400"
+                    }`}>
+                    {label}
+                  </button>
+                ))}
               </div>
-            </Field>
-            <button
-              onClick={() => patchBiz({ content }, "Website updated")}
-              className="rounded-full bg-amber-700 text-white px-6 py-3 text-sm font-semibold hover:bg-amber-800 transition"
-            >
-              Save changes
-            </button>
+            </Section>
+
+            {/* Hero */}
+            <Section icon={Sparkles} title="Hero" subtitle="The first thing visitors see">
+              <EditableFields
+                fields={[
+                  { key: "headline", label: "Headline", value: content.headline || "" },
+                  { key: "tagline", label: "Tagline", value: content.tagline || "" },
+                  { key: "cta_label", label: "Button label", value: content.cta_label || "" },
+                ]}
+                onSave={(vals) => saveContent(vals, "Hero updated")}
+              />
+            </Section>
+
+            {/* About */}
+            <Section icon={Globe} title="About" subtitle="Your story">
+              <EditableFields
+                fields={[{ key: "about", label: "About text", value: content.about || "", rows: 4 }]}
+                onSave={(vals) => saveContent(vals, "About updated")}
+              />
+            </Section>
+
+            {/* Services */}
+            <Section icon={Package} title="What we do" subtitle="Three service highlights">
+              <ServicesEditor
+                services={content.services || []}
+                onSave={(services) => saveContent({ services }, "Services updated")}
+              />
+            </Section>
+
+            {/* Pages & tabs */}
+            <Section icon={LayoutDashboard} title="Pages & tabs" subtitle="Rename, reorder visibility, add pages, edit their text">
+              <div className="space-y-2">
+                {siteTabs.map((t) => (
+                  <div key={t.key} className="border border-slate-200 rounded-xl overflow-hidden">
+                    <div className={`flex items-center gap-3 px-3.5 py-2.5 ${t.enabled ? "bg-blue-50/40" : "bg-white"}`}>
+                      <button
+                        onClick={() => setSiteTabs(siteTabs.map((x) => (x.key === t.key ? { ...x, enabled: !x.enabled } : x)))}
+                        className={`w-5 h-5 rounded flex items-center justify-center cursor-pointer transition ${
+                          t.enabled ? "bg-blue-600 text-white" : "border-2 border-slate-300"
+                        }`}>
+                        {t.enabled && <Check size={12} />}
+                      </button>
+                      {editingTab === t.key ? (
+                        <input autoFocus defaultValue={t.label}
+                          onBlur={(e) => {
+                            const label = e.target.value.trim() || t.label;
+                            setSiteTabs(siteTabs.map((x) => (x.key === t.key ? { ...x, label } : x)));
+                            setEditingTab(null);
+                          }}
+                          onKeyDown={(e) => e.key === "Enter" && (e.target as HTMLInputElement).blur()}
+                          className="flex-1 text-sm font-medium border-b border-blue-400 outline-none bg-transparent" />
+                      ) : (
+                        <span className="flex-1 text-sm font-medium">{t.label}</span>
+                      )}
+                      <button onClick={() => setEditingTab(t.key)} className="text-slate-400 hover:text-blue-600 cursor-pointer">
+                        <Pencil size={13} />
+                      </button>
+                      {t.text && (
+                        <button onClick={() => setExpandedPage(expandedPage === t.key ? null : t.key)}
+                          className="flex items-center gap-1 text-xs text-blue-600 cursor-pointer">
+                          Content {expandedPage === t.key ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
+                        </button>
+                      )}
+                      {!t.builtin && (
+                        <button onClick={() => setSiteTabs(siteTabs.filter((x) => x.key !== t.key))}
+                          className="text-slate-400 hover:text-red-500 cursor-pointer"><X size={14} /></button>
+                      )}
+                    </div>
+                    {t.text && expandedPage === t.key && (
+                      <div className="p-3.5 border-t border-slate-200 bg-white">
+                        <textarea
+                          value={pages[t.key] || ""}
+                          onChange={(e) => setPages({ ...pages, [t.key]: e.target.value })}
+                          rows={6}
+                          placeholder={`Write the content for "${t.label}" — separate paragraphs with a blank line.`}
+                          className="inp !text-sm"
+                        />
+                      </div>
+                    )}
+                  </div>
+                ))}
+                {addingTab ? (
+                  <div className="flex items-center gap-3 border border-blue-300 rounded-xl px-3.5 py-2.5">
+                    <Plus size={15} className="text-blue-600" />
+                    <input autoFocus value={newTabName} onChange={(e) => setNewTabName(e.target.value)}
+                      onKeyDown={(e) => e.key === "Enter" && addCustomTab()}
+                      placeholder="Tab name, e.g. Workshops" className="flex-1 text-sm outline-none" />
+                    <button onClick={addCustomTab} className="text-sm font-semibold text-blue-600 cursor-pointer">Add</button>
+                    <button onClick={() => setAddingTab(false)} className="text-slate-400 cursor-pointer"><X size={14} /></button>
+                  </div>
+                ) : (
+                  <button onClick={() => setAddingTab(true)}
+                    className="w-full flex items-center justify-center gap-2 border border-dashed border-slate-300 rounded-xl px-3.5 py-2.5 text-sm text-slate-500 hover:text-blue-600 hover:border-blue-400 cursor-pointer transition">
+                    <Plus size={14} /> Add a tab
+                  </button>
+                )}
+              </div>
+              <div className="flex justify-end mt-3">
+                <button onClick={() => saveContent({}, "Pages saved")} className="btn-primary !py-1.5 !text-xs">
+                  <Save size={13} /> Save pages
+                </button>
+              </div>
+            </Section>
+
+            {/* Contact */}
+            <Section icon={MessageCircle} title="Contact info" subtitle="Where enquiries reach you">
+              <EditableBizFields biz={biz} onSave={(vals) => patchBiz(vals, "Contact updated")} />
+            </Section>
           </div>
         )}
 
         {tab === "Reels" && (
-          <div className="space-y-8">
+          <div className="space-y-4">
             {mediaProvider === "off" && (
-              <div className="rounded-2xl bg-amber-50 border border-amber-200 text-amber-900 px-5 py-4 text-sm">
-                🎬 The reel studio&apos;s AI video provider is not connected in this preview.
-                Everything else works — reels switch on the moment a provider key is added.
+              <div className="rounded-xl bg-amber-50 border border-amber-200 text-amber-900 px-4 py-3 text-sm">
+                The AI video provider is not connected — reels switch on when a provider key is added.
               </div>
             )}
-            <div className="rounded-2xl bg-white border border-stone-200 p-6">
-              <p className="font-semibold mb-1">Create a reel pack</p>
-              <p className="text-sm text-stone-500 mb-4">
-                Pick a catalogue item — we generate 2 Instagram-ready reels (9:16).
-                {" "}{2 - quota.reel_packs_used} pack{2 - quota.reel_packs_used === 1 ? "" : "s"} left in this preview.
-              </p>
-              <div className="flex gap-4 overflow-x-auto pb-2">
-                {readyProducts.map((p) => (
-                  <button
-                    key={p.id}
-                    onClick={() => makeReels(p.id)}
-                    disabled={busy || quota.reel_packs_used >= 2 || mediaProvider === "off"}
-                    className="shrink-0 w-28 group disabled:opacity-40"
-                  >
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img
-                      src={p.processed_url || p.original_url}
-                      alt={p.title}
-                      className="w-28 h-28 object-cover rounded-xl border-2 border-transparent group-hover:border-amber-700 transition"
-                    />
-                    <p className="text-xs mt-1.5 truncate">{p.title}</p>
-                    <p className="text-[11px] text-amber-700 font-medium">🎬 Make reels</p>
-                  </button>
-                ))}
-                {!readyProducts.length && (
-                  <p className="text-sm text-stone-400 py-6">Add catalogue photos first.</p>
-                )}
+
+            {/* Step 1: Inspiration */}
+            <div className="card p-5">
+              <div className="flex items-center justify-between mb-1">
+                <p className="font-semibold text-sm flex items-center gap-2">
+                  <Lightbulb size={16} className="text-blue-600" /> Step 1 — Get inspiration
+                  <span className="text-slate-400 font-normal">(optional)</span>
+                </p>
+                <button onClick={getInspiration} disabled={ideasBusy} className="btn-secondary !py-1.5 !text-xs">
+                  <Sparkles size={13} /> {ideasBusy ? "Searching the web…" : ideas ? "Refresh ideas" : "Get inspiration"}
+                </button>
               </div>
+              <p className="text-xs text-slate-500 mb-3">
+                We search the web for reel trends in your industry and turn them into ready-to-use ideas.
+              </p>
+              {ideasBusy && (
+                <div className="grid sm:grid-cols-2 gap-3">
+                  {[1, 2, 3, 4].map((i) => <div key={i} className="h-24 rounded-xl shimmer" />)}
+                </div>
+              )}
+              {ideas && !ideasBusy && (
+                <div className="grid sm:grid-cols-2 gap-3">
+                  {ideas.map((idea, i) => (
+                    <button key={i} onClick={() => selectIdea(i)}
+                      className={`text-left rounded-xl border p-3.5 cursor-pointer transition ${
+                        selectedIdea === i ? "border-blue-600 ring-2 ring-blue-600/15 bg-blue-50/40" : "border-slate-200 hover:border-blue-300"
+                      }`}>
+                      <div className="flex items-start justify-between gap-2">
+                        <p className="font-semibold text-sm">{idea.title}</p>
+                        {selectedIdea === i && <Check size={15} className="text-blue-600 shrink-0" />}
+                      </div>
+                      <p className="text-xs text-blue-700 mt-1">&ldquo;{idea.hook}&rdquo;</p>
+                      <p className="text-xs text-slate-500 mt-1.5 line-clamp-2">{idea.description}</p>
+                      <p className="text-[10px] text-slate-400 mt-1.5 uppercase tracking-wide">{idea.source}</p>
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
 
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-5">
-              {reels.map((r) => (
-                <div key={r.id} className="rounded-2xl bg-white border border-stone-200 overflow-hidden">
-                  {r.status === "ready" ? (
-                    <video src={r.video_url} controls playsInline className="aspect-[9/16] w-full object-cover bg-black" />
-                  ) : r.status === "failed" ? (
-                    <div className="aspect-[9/16] flex items-center justify-center text-xs text-red-500 p-4 text-center">
-                      Failed: {r.error?.slice(0, 80)}
-                    </div>
-                  ) : (
-                    <div className="aspect-[9/16] shimmer flex items-end justify-center pb-6">
-                      <p className="text-xs text-stone-500">🎬 Generating…</p>
-                    </div>
-                  )}
-                  <div className="p-3 flex items-center justify-between">
-                    <span className="text-xs capitalize text-stone-500">{r.variant}</span>
-                    {r.status === "ready" && (
-                      <a href={r.video_url} download className="text-xs font-semibold text-amber-700">
-                        Download ↓
-                      </a>
-                    )}
+            {/* Step 2: Make reel */}
+            <div className="card p-5">
+              <p className="font-semibold text-sm flex items-center gap-2 mb-1">
+                <Clapperboard size={16} className="text-blue-600" /> Step 2 — Make your reel
+              </p>
+              <p className="text-xs text-slate-500 mb-3">
+                Pick a product · {packsLeft > 0 ? `${packsLeft} pack${packsLeft === 1 ? "" : "s"} left (2 reels each)` : "no packs left in this preview"}
+              </p>
+              <div className="flex gap-3 overflow-x-auto pb-2">
+                {readyProducts.map((p) => (
+                  <button key={p.id} onClick={() => setReelProduct(reelProduct === p.id ? null : p.id)}
+                    disabled={packsLeft <= 0 || mediaProvider === "off"}
+                    className="shrink-0 w-24 cursor-pointer disabled:opacity-40 group">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={p.processed_url || p.original_url} alt={p.title}
+                      className={`w-24 h-24 object-cover rounded-xl border-2 transition ${
+                        reelProduct === p.id ? "border-blue-600 ring-2 ring-blue-600/20" : "border-transparent group-hover:border-blue-300"
+                      }`} />
+                    <p className="text-[11px] mt-1 truncate text-center">{p.title}</p>
+                  </button>
+                ))}
+                {!readyProducts.length && <p className="text-sm text-slate-400 py-4">Add catalogue photos first.</p>}
+              </div>
+              {reelProduct && (
+                <div className="mt-3 space-y-3 step-enter">
+                  <div>
+                    <label className="field-label">Describe your reel {selectedIdea !== null && <span className="text-blue-600 normal-case">(from your selected idea — edit freely)</span>}</label>
+                    <textarea value={brief} onChange={(e) => setBrief(e.target.value)} rows={3}
+                      placeholder="e.g. Slow elegant close-up with festive lighting, Diwali offer mood, warm golden tones"
+                      className="inp !text-sm" />
                   </div>
+                  <button onClick={makeReels} disabled={busy} className="btn-primary !text-sm">
+                    <Wand2 size={15} /> {busy ? "Starting…" : "Generate 2 reels"}
+                  </button>
                 </div>
-              ))}
+              )}
             </div>
+
+            {/* Reel gallery */}
+            {reels.length > 0 && (
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                {reels.map((r) => (
+                  <div key={r.id} className="card overflow-hidden">
+                    {r.status === "ready" ? (
+                      <video src={r.video_url} controls playsInline className="aspect-[9/16] w-full object-cover bg-black" />
+                    ) : r.status === "failed" ? (
+                      <div className="aspect-[9/16] flex items-center justify-center text-xs text-red-500 p-4 text-center">
+                        Failed: {r.error?.slice(0, 70)}
+                      </div>
+                    ) : (
+                      <div className="aspect-[9/16] shimmer flex items-end justify-center pb-5">
+                        <p className="text-xs text-slate-500">Generating…</p>
+                      </div>
+                    )}
+                    <div className="p-2.5 flex items-center justify-between">
+                      <span className="text-xs capitalize text-slate-500">{r.variant}</span>
+                      {r.status === "ready" && (
+                        <a href={r.video_url} download className="text-xs font-semibold text-blue-600">Download ↓</a>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         )}
 
         {tab === "Leads" && (
-          <div className="rounded-2xl bg-white border border-stone-200 overflow-hidden">
+          <div className="card overflow-hidden">
             {leads.length ? (
               <table className="w-full text-sm">
-                <thead className="bg-stone-50 text-left text-stone-500">
+                <thead className="bg-slate-50 text-left text-slate-500">
                   <tr>
-                    <th className="px-5 py-3 font-medium">Name</th>
-                    <th className="px-5 py-3 font-medium">Phone</th>
-                    <th className="px-5 py-3 font-medium">Message</th>
-                    <th className="px-5 py-3 font-medium">When</th>
-                    <th className="px-5 py-3" />
+                    <th className="px-4 py-2.5 font-medium">Name</th>
+                    <th className="px-4 py-2.5 font-medium">Phone</th>
+                    <th className="px-4 py-2.5 font-medium">Message</th>
+                    <th className="px-4 py-2.5 font-medium">When</th>
+                    <th className="px-4 py-2.5" />
                   </tr>
                 </thead>
                 <tbody>
                   {leads.map((l) => (
-                    <tr key={l.id} className="border-t border-stone-100">
-                      <td className="px-5 py-3">{l.name || "—"}</td>
-                      <td className="px-5 py-3">{l.phone}</td>
-                      <td className="px-5 py-3 max-w-xs truncate">{l.message}</td>
-                      <td className="px-5 py-3 text-stone-400">
-                        {new Date(l.created_at).toLocaleDateString("en-IN", {
-                          day: "numeric", month: "short",
-                        })}
+                    <tr key={l.id} className="border-t border-slate-100">
+                      <td className="px-4 py-2.5">{l.name || "—"}</td>
+                      <td className="px-4 py-2.5">{l.phone}</td>
+                      <td className="px-4 py-2.5 max-w-xs truncate">{l.message}</td>
+                      <td className="px-4 py-2.5 text-slate-400">
+                        {new Date(l.created_at).toLocaleDateString("en-IN", { day: "numeric", month: "short" })}
                       </td>
-                      <td className="px-5 py-3">
-                        <a
-                          href={`https://wa.me/${l.phone.replace(/\D/g, "").length === 10 ? "91" : ""}${l.phone.replace(/\D/g, "")}`}
-                          target="_blank"
-                          className="text-xs font-semibold text-green-700"
-                        >
-                          Reply on WhatsApp →
+                      <td className="px-4 py-2.5">
+                        <a href={`https://wa.me/${l.phone.replace(/\D/g, "").length === 10 ? "91" : ""}${l.phone.replace(/\D/g, "")}`}
+                          target="_blank" className="flex items-center gap-1 text-xs font-semibold text-emerald-600">
+                          <MessageCircle size={13} /> Reply
                         </a>
                       </td>
                     </tr>
@@ -564,7 +724,7 @@ export default function Admin({ params }: { params: Promise<{ id: string }> }) {
                 </tbody>
               </table>
             ) : (
-              <p className="text-center text-stone-400 py-16">
+              <p className="text-center text-slate-400 py-14">
                 No enquiries yet — share your website link on WhatsApp Status and Instagram.
               </p>
             )}
@@ -575,20 +735,123 @@ export default function Admin({ params }: { params: Promise<{ id: string }> }) {
   );
 }
 
-function Stat({ label, value }: { label: string; value: string }) {
+function Stat({ icon: Icon, label, value }: { icon: React.ComponentType<{ size?: number; className?: string }>; label: string; value: string }) {
   return (
-    <div className="rounded-2xl bg-white border border-stone-200 p-6">
-      <p className="text-3xl font-semibold">{value}</p>
-      <p className="text-sm text-stone-500 mt-1">{label}</p>
+    <div className="card p-4 flex items-center gap-3.5">
+      <div className="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center">
+        <Icon size={18} />
+      </div>
+      <div>
+        <p className="text-2xl font-bold leading-tight">{value}</p>
+        <p className="text-xs text-slate-500">{label}</p>
+      </div>
     </div>
   );
 }
 
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
+function Section({
+  icon: Icon, title, subtitle, children,
+}: {
+  icon: React.ComponentType<{ size?: number; className?: string }>;
+  title: string; subtitle: string; children: React.ReactNode;
+}) {
   return (
-    <label className="block">
-      <span className="block text-sm font-medium text-stone-700 mb-2">{label}</span>
+    <div className="card p-5">
+      <div className="flex items-center gap-2.5 mb-4">
+        <div className="w-8 h-8 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center">
+          <Icon size={15} />
+        </div>
+        <div>
+          <p className="font-semibold text-sm leading-tight">{title}</p>
+          <p className="text-xs text-slate-400">{subtitle}</p>
+        </div>
+      </div>
       {children}
-    </label>
+    </div>
+  );
+}
+
+function EditableFields({
+  fields, onSave,
+}: {
+  fields: { key: string; label: string; value: string; rows?: number }[];
+  onSave: (vals: Record<string, string>) => void;
+}) {
+  const [vals, setVals] = useState<Record<string, string>>(
+    Object.fromEntries(fields.map((f) => [f.key, f.value]))
+  );
+  const dirty = fields.some((f) => vals[f.key] !== f.value);
+  return (
+    <div className="space-y-3">
+      {fields.map((f) => (
+        <div key={f.key}>
+          <label className="field-label">{f.label}</label>
+          {f.rows ? (
+            <textarea value={vals[f.key]} rows={f.rows} onChange={(e) => setVals({ ...vals, [f.key]: e.target.value })} className="inp !text-sm" />
+          ) : (
+            <input value={vals[f.key]} onChange={(e) => setVals({ ...vals, [f.key]: e.target.value })} className="inp !text-sm" />
+          )}
+        </div>
+      ))}
+      <div className="flex justify-end">
+        <button onClick={() => onSave(vals)} className={dirty ? "btn-primary !py-1.5 !text-xs" : "btn-secondary !py-1.5 !text-xs"}>
+          <Save size={13} /> Save
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function ServicesEditor({
+  services, onSave,
+}: {
+  services: { title: string; desc: string }[];
+  onSave: (s: { title: string; desc: string }[]) => void;
+}) {
+  const [items, setItems] = useState(services.length ? services : [{ title: "", desc: "" }, { title: "", desc: "" }, { title: "", desc: "" }]);
+  return (
+    <div className="space-y-2.5">
+      {items.map((s, i) => (
+        <div key={i} className="grid grid-cols-3 gap-2.5">
+          <input value={s.title} placeholder="Service"
+            onChange={(e) => setItems(items.map((x, j) => (j === i ? { ...x, title: e.target.value } : x)))}
+            className="inp !py-1.5 !text-sm col-span-1" />
+          <input value={s.desc} placeholder="One-line description"
+            onChange={(e) => setItems(items.map((x, j) => (j === i ? { ...x, desc: e.target.value } : x)))}
+            className="inp !py-1.5 !text-sm col-span-2" />
+        </div>
+      ))}
+      <div className="flex justify-end">
+        <button onClick={() => onSave(items.filter((s) => s.title.trim()))} className="btn-primary !py-1.5 !text-xs">
+          <Save size={13} /> Save
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function EditableBizFields({
+  biz, onSave,
+}: {
+  biz: { phone: string; whatsapp: string; city: string };
+  onSave: (vals: Record<string, string>) => void;
+}) {
+  const [vals, setVals] = useState({ phone: biz.phone, whatsapp: biz.whatsapp, city: biz.city });
+  return (
+    <div className="space-y-3">
+      <div className="grid grid-cols-3 gap-3">
+        {(["phone", "whatsapp", "city"] as const).map((k) => (
+          <div key={k}>
+            <label className="field-label capitalize">{k}</label>
+            <input value={vals[k]} onChange={(e) => setVals({ ...vals, [k]: e.target.value })} className="inp !py-1.5 !text-sm" />
+          </div>
+        ))}
+      </div>
+      <div className="flex justify-end">
+        <button onClick={() => onSave(vals)} className="btn-primary !py-1.5 !text-xs">
+          <Save size={13} /> Save
+        </button>
+      </div>
+    </div>
   );
 }

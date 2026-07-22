@@ -77,8 +77,8 @@ export default function Studio({ params }: { params: Promise<{ id: string }> }) 
   };
 
   return (
-    <div className="h-screen flex flex-col bg-stone-100">
-      <header className="bg-white border-b border-stone-200 px-5 py-3 flex items-center justify-between shrink-0">
+    <div className="h-screen flex flex-col bg-slate-100">
+      <header className="bg-white border-b border-slate-200 px-5 py-3 flex items-center justify-between shrink-0">
         <div className="flex items-center gap-3 min-w-0">
           <Link href="/" className="font-display text-lg font-semibold shrink-0">Jhalak</Link>
           <span className="text-stone-300">/</span>
@@ -90,16 +90,16 @@ export default function Studio({ params }: { params: Promise<{ id: string }> }) 
           </span>
         </div>
         <div className="flex items-center gap-2 shrink-0">
-          <Link href={`/admin/${id}`} className="rounded-full border border-stone-300 px-4 py-2 text-sm hover:border-stone-500 transition">
+          <Link href={`/admin/${id}`} className="rounded-full border border-slate-300 px-4 py-2 text-sm hover:border-slate-500 transition">
             Dashboard
           </Link>
           {slug && (
-            <a href={`/s/${slug}`} target="_blank" className="rounded-full border border-stone-300 px-4 py-2 text-sm hover:border-stone-500 transition">
+            <a href={`/s/${slug}`} target="_blank" className="rounded-full border border-slate-300 px-4 py-2 text-sm hover:border-slate-500 transition">
               Open site ↗
             </a>
           )}
           <button onClick={publish} disabled={busy || status === "published"}
-            className="rounded-full bg-amber-700 text-white px-5 py-2 text-sm font-semibold hover:bg-amber-800 transition disabled:opacity-50">
+            className="rounded-full bg-blue-600 text-white px-5 py-2 text-sm font-semibold hover:bg-blue-700 transition disabled:opacity-50">
             {status === "published" ? "✓ Live" : "🚀 Publish"}
           </button>
         </div>
@@ -107,11 +107,11 @@ export default function Studio({ params }: { params: Promise<{ id: string }> }) 
 
       <div className="flex-1 flex min-h-0">
         {/* chat panel */}
-        <div className="w-full sm:w-[420px] shrink-0 flex flex-col border-r border-stone-200 bg-white">
+        <div className="w-full sm:w-[420px] shrink-0 flex flex-col border-r border-slate-200 bg-white">
           <div className="flex-1 overflow-y-auto p-5 space-y-4">
             {!messages.length && (
               <div className="space-y-4">
-                <p className="text-sm text-stone-600 leading-6">
+                <p className="text-sm text-slate-600 leading-6">
                   👋 This is your <b>website editor</b>. Tell me what to change — copy,
                   colors, template, tabs, product prices — and you&apos;ll see it update
                   in the preview instantly.
@@ -119,7 +119,7 @@ export default function Studio({ params }: { params: Promise<{ id: string }> }) 
                 <div className="space-y-2">
                   {SUGGESTIONS.map((s) => (
                     <button key={s} onClick={() => send(s)}
-                      className="block w-full text-left text-sm rounded-xl border border-stone-200 px-4 py-2.5 hover:border-amber-700 hover:text-amber-800 transition">
+                      className="block w-full text-left text-sm rounded-xl border border-slate-200 px-4 py-2.5 hover:border-blue-500 hover:text-blue-700 transition">
                       {s}
                     </button>
                   ))}
@@ -129,7 +129,7 @@ export default function Studio({ params }: { params: Promise<{ id: string }> }) 
             {messages.map((m, i) => (
               <div key={i} className={m.role === "user" ? "flex justify-end" : "flex justify-start"}>
                 <div className={`max-w-[85%] rounded-2xl px-4 py-2.5 text-sm leading-6 whitespace-pre-wrap ${
-                  m.role === "user" ? "bg-stone-900 text-white" : "bg-stone-100"
+                  m.role === "user" ? "bg-slate-900 text-white" : "bg-slate-100"
                 }`}>
                   {m.content}
                 </div>
@@ -137,7 +137,7 @@ export default function Studio({ params }: { params: Promise<{ id: string }> }) 
             ))}
             {busy && (
               <div className="flex justify-start">
-                <div className="rounded-2xl px-4 py-2.5 text-sm bg-stone-100 text-stone-400">
+                <div className="rounded-2xl px-4 py-2.5 text-sm bg-slate-100 text-slate-400">
                   Making changes…
                 </div>
               </div>
@@ -152,7 +152,7 @@ export default function Studio({ params }: { params: Promise<{ id: string }> }) 
             )}
             <div ref={chatEnd} />
           </div>
-          <div className="p-4 border-t border-stone-200">
+          <div className="p-4 border-t border-slate-200">
             <div className="flex gap-2">
               <input
                 value={input}
@@ -160,10 +160,10 @@ export default function Studio({ params }: { params: Promise<{ id: string }> }) 
                 onKeyDown={(e) => e.key === "Enter" && send()}
                 placeholder="e.g. Make the headline about bridal wear…"
                 disabled={busy}
-                className="flex-1 border border-stone-300 rounded-full px-4 py-2.5 text-sm outline-none focus:border-amber-700 disabled:opacity-50"
+                className="flex-1 border border-slate-300 rounded-full px-4 py-2.5 text-sm outline-none focus:border-blue-600 disabled:opacity-50"
               />
               <button onClick={() => send()} disabled={busy || !input.trim()}
-                className="rounded-full bg-amber-700 text-white px-5 py-2.5 text-sm font-semibold hover:bg-amber-800 transition disabled:opacity-50">
+                className="rounded-full bg-blue-600 text-white px-5 py-2.5 text-sm font-semibold hover:bg-blue-700 transition disabled:opacity-50">
                 Send
               </button>
             </div>
@@ -171,12 +171,12 @@ export default function Studio({ params }: { params: Promise<{ id: string }> }) 
         </div>
 
         {/* live preview */}
-        <div className="hidden sm:flex flex-1 flex-col bg-stone-200 p-4">
+        <div className="hidden sm:flex flex-1 flex-col bg-slate-200 p-4">
           <div className="flex-1 rounded-2xl overflow-hidden bg-white shadow-xl">
             {slug ? (
               <iframe key={version} src={`/s/${slug}`} className="w-full h-full" title="Website preview" />
             ) : (
-              <div className="w-full h-full flex items-center justify-center text-stone-400">Loading preview…</div>
+              <div className="w-full h-full flex items-center justify-center text-slate-400">Loading preview…</div>
             )}
           </div>
         </div>

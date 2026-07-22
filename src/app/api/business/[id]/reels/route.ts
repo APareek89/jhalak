@@ -14,7 +14,7 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string
         { status: 503 }
       );
     }
-    const { product_id } = await req.json();
+    const { product_id, brief } = await req.json();
     const biz = await q<{ name: string; category: string; city: string; language: string }>(
       `select name, category, city, language from jhalak.businesses where id=$1`, [id]
     );
@@ -43,7 +43,12 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string
     }
 
     await q(`update jhalak.quotas set reel_packs_used = reel_packs_used + 1 where business_id=$1`, [id]);
-    generateReelPack(id, { id: p.id, title: p.title, description: p.description, image_media_id: imageMediaId }, biz[0]);
+    generateReelPack(
+      id,
+      { id: p.id, title: p.title, description: p.description, image_media_id: imageMediaId },
+      biz[0],
+      typeof brief === "string" ? brief.slice(0, 600) : undefined
+    );
     return NextResponse.json({ ok: true, note: "Reel pack generating — takes 1-4 minutes." });
   } catch (e) {
     return NextResponse.json({ error: e instanceof Error ? e.message : "failed" }, { status: 500 });

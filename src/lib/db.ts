@@ -100,6 +100,7 @@ create table if not exists jhalak.media (
 
 alter table jhalak.products add column if not exists category text not null default '';
 alter table jhalak.products add column if not exists discount_pct int not null default 0;
+alter table jhalak.businesses add column if not exists logo_url text not null default '';
 `;
 
 export function ensureSchema(): Promise<void> {

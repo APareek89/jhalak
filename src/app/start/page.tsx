@@ -3,42 +3,123 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import {
+  Store, Scissors, Stethoscope, Dumbbell, UtensilsCrossed, Briefcase,
+  Check, Pencil, Plus, Upload, ArrowRight, ArrowLeft, Sparkles, ImagePlus,
+  Globe, FileText, X, Save, LayoutTemplate,
+} from "lucide-react";
 import { fetchJson, downscaleImage } from "@/lib/client";
 
 type SiteCopy = {
-  headline: string;
-  tagline: string;
-  about: string;
-  services: { title: string; desc: string }[];
-  cta_label: string;
+  headline: string; tagline: string; about: string;
+  services: { title: string; desc: string }[]; cta_label: string;
 };
-
 type Product = {
-  id: string;
-  title: string;
-  description: string;
-  category: string;
-  price_text: string;
-  discount_pct: number;
-  status: string;
-  original_url: string;
-  processed_url: string;
+  id: string; title: string; description: string; category: string;
+  price_text: string; discount_pct: number; status: string;
+  original_url: string; processed_url: string;
 };
+type Tab = { key: string; label: string; enabled: boolean; builtin: boolean; text: boolean };
 
 const CATEGORIES = [
-  { id: "boutique", label: "Boutique / Store" },
-  { id: "salon", label: "Salon / Spa" },
-  { id: "clinic", label: "Clinic" },
-  { id: "gym", label: "Gym / Fitness" },
-  { id: "restaurant", label: "Restaurant / Café" },
-  { id: "other", label: "Other" },
+  { id: "boutique", label: "Boutique / Store", icon: Store },
+  { id: "salon", label: "Salon / Spa", icon: Scissors },
+  { id: "clinic", label: "Clinic", icon: Stethoscope },
+  { id: "gym", label: "Gym / Fitness", icon: Dumbbell },
+  { id: "restaurant", label: "Restaurant / Café", icon: UtensilsCrossed },
+  { id: "other", label: "Other", icon: Briefcase },
 ];
 
-const STANDARD_TABS = [
-  { id: "products", label: "Our Products", desc: "Catalogue with categories, prices & discounts", locked: false },
-  { id: "about", label: "About Us", desc: "Your story and what you do", locked: false },
-  { id: "gallery", label: "Gallery", desc: "A photo wall of your work & space", locked: false },
-  { id: "contact", label: "Contact", desc: "Enquiry form + WhatsApp & call buttons", locked: false },
+const DEFAULT_TABS: Tab[] = [
+  { key: "products", label: "Our Products", enabled: true, builtin: true, text: false },
+  { key: "about", label: "About Us", enabled: true, builtin: true, text: false },
+  { key: "gallery", label: "Gallery", enabled: false, builtin: true, text: false },
+  { key: "contact", label: "Contact", enabled: true, builtin: true, text: false },
+  { key: "pricing", label: "Pricing", enabled: false, builtin: true, text: true },
+  { key: "terms", label: "Terms & Conditions", enabled: false, builtin: true, text: true },
+  { key: "faq", label: "FAQ", enabled: false, builtin: true, text: true },
+];
+
+const TEMPLATES = [
+  {
+    id: "elegant", title: "Elegant", desc: "Warm & classic — boutiques, designers",
+    preview: (
+      <div className="h-36 rounded-lg bg-[#f6f1e9] border border-stone-200 p-3 flex flex-col gap-2 overflow-hidden">
+        <div className="flex items-center justify-between">
+          <div className="w-14 h-2 rounded bg-stone-700" />
+          <div className="w-10 h-3 rounded-full bg-amber-800" />
+        </div>
+        <div className="flex gap-2 flex-1">
+          <div className="flex-1 flex flex-col justify-center gap-1.5">
+            <div className="w-full h-3 rounded bg-stone-800" />
+            <div className="w-4/5 h-3 rounded bg-stone-800" />
+            <div className="w-3/5 h-1.5 rounded bg-stone-400" />
+            <div className="w-12 h-3.5 rounded-full bg-amber-800 mt-1" />
+          </div>
+          <div className="w-16 rounded-md bg-gradient-to-br from-amber-200 to-amber-400" />
+        </div>
+      </div>
+    ),
+  },
+  {
+    id: "bold", title: "Bold", desc: "Dark & confident — gyms, studios",
+    preview: (
+      <div className="h-36 rounded-lg bg-stone-950 p-3 flex flex-col gap-2 overflow-hidden">
+        <div className="flex items-center justify-between">
+          <div className="w-14 h-2 rounded bg-white" />
+          <div className="w-10 h-3 rounded-full bg-violet-500" />
+        </div>
+        <div className="flex gap-2 flex-1">
+          <div className="flex-1 flex flex-col justify-center gap-1.5">
+            <div className="w-full h-3.5 rounded bg-white" />
+            <div className="w-3/4 h-3.5 rounded bg-white" />
+            <div className="w-1/2 h-1.5 rounded bg-stone-600" />
+            <div className="w-12 h-3.5 rounded-full bg-violet-500 mt-1" />
+          </div>
+          <div className="w-16 rounded-md bg-gradient-to-br from-violet-400 to-violet-700" />
+        </div>
+      </div>
+    ),
+  },
+  {
+    id: "professional", title: "Professional", desc: "Clean & corporate — clinics, services",
+    preview: (
+      <div className="h-36 rounded-lg bg-slate-50 border border-slate-200 p-3 flex flex-col gap-2 overflow-hidden">
+        <div className="flex items-center justify-between bg-white -m-3 mb-0 p-2 border-b border-slate-200">
+          <div className="w-14 h-2 rounded bg-slate-700" />
+          <div className="w-10 h-3 rounded-full bg-blue-600" />
+        </div>
+        <div className="flex gap-2 flex-1 pt-1">
+          <div className="flex-1 flex flex-col justify-center gap-1.5">
+            <div className="w-full h-3 rounded bg-slate-800" />
+            <div className="w-2/3 h-1.5 rounded bg-slate-400" />
+            <div className="flex gap-1 mt-1">
+              <div className="w-10 h-6 rounded bg-white border border-slate-200" />
+              <div className="w-10 h-6 rounded bg-white border border-slate-200" />
+              <div className="w-10 h-6 rounded bg-white border border-slate-200" />
+            </div>
+          </div>
+          <div className="w-16 rounded-md bg-gradient-to-br from-blue-200 to-blue-500" />
+        </div>
+      </div>
+    ),
+  },
+  {
+    id: "minimal", title: "Minimal", desc: "Airy & understated — studios, cafés",
+    preview: (
+      <div className="h-36 rounded-lg bg-white border border-neutral-200 p-3 flex flex-col gap-2 overflow-hidden">
+        <div className="flex items-center justify-between">
+          <div className="w-14 h-2 rounded bg-neutral-400" />
+          <div className="w-10 h-2 rounded bg-neutral-300" />
+        </div>
+        <div className="flex-1 flex flex-col items-center justify-center gap-1.5">
+          <div className="w-2/3 h-3 rounded bg-neutral-800" />
+          <div className="w-1/2 h-1.5 rounded bg-neutral-300" />
+          <div className="w-11 h-3 rounded-full border border-neutral-400 mt-1" />
+        </div>
+      </div>
+    ),
+  },
 ];
 
 export default function StartWizard() {
@@ -47,30 +128,33 @@ export default function StartWizard() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
 
-  // step 1 — basics
   const [name, setName] = useState("");
   const [category, setCategory] = useState("boutique");
   const [city, setCity] = useState("");
   const [phone, setPhone] = useState("");
   const [language, setLanguage] = useState("english");
   const [bizId, setBizId] = useState("");
-  const [slug, setSlug] = useState("");
-  // step 2 — style
+  const [logoUrl, setLogoUrl] = useState("");
+  const logoRef = useRef<HTMLInputElement>(null);
+
   const [template, setTemplate] = useState("elegant");
-  // step 3 — structure
-  const [tabs, setTabs] = useState<Record<string, boolean>>({
-    products: true, about: true, gallery: false, contact: true,
-  });
+
+  const [tabs, setTabs] = useState<Tab[]>(DEFAULT_TABS);
+  const [editingTab, setEditingTab] = useState<string | null>(null);
+  const [newTabName, setNewTabName] = useState("");
+  const [addingTab, setAddingTab] = useState(false);
   const [refUrl, setRefUrl] = useState("");
   const [refStatus, setRefStatus] = useState("");
   const docRef = useRef<HTMLInputElement>(null);
-  // step 4 — story
+
   const [offering, setOffering] = useState("");
   const [special, setSpecial] = useState("");
   const [action, setAction] = useState("");
   const [copy, setCopy] = useState<SiteCopy | null>(null);
-  // step 5 — photos
+
   const [products, setProducts] = useState<Product[]>([]);
+  const [drafts, setDrafts] = useState<Record<string, Partial<Product>>>({});
+  const [savedIds, setSavedIds] = useState<Set<string>>(new Set());
   const fileRef = useRef<HTMLInputElement>(null);
 
   const createBusiness = async () => {
@@ -85,8 +169,17 @@ export default function StartWizard() {
     setBusy(false);
     if (!r.ok || !r.data) return setError(r.error);
     setBizId(r.data.id);
-    setSlug(r.data.slug);
     setStep(2);
+  };
+
+  const uploadLogo = async (files: FileList | null) => {
+    if (!files?.[0] || !bizId) return;
+    const fd = new FormData();
+    fd.append("file", files[0]);
+    const r = await fetchJson<{ logo_url: string }>(`/api/business/${bizId}/logo`, { method: "POST", body: fd });
+    if (r.ok && r.data) setLogoUrl(r.data.logo_url);
+    else setError(r.error);
+    if (logoRef.current) logoRef.current.value = "";
   };
 
   const saveTemplate = async (t: string) => {
@@ -100,14 +193,23 @@ export default function StartWizard() {
 
   const saveStructure = async () => {
     setBusy(true);
-    setError("");
     await fetchJson(`/api/business/${bizId}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ content: { tabs } }),
+      body: JSON.stringify({ content: { tabs_config: tabs } }),
     });
     setBusy(false);
     setStep(4);
+  };
+
+  const addCustomTab = () => {
+    const label = newTabName.trim();
+    if (!label) return;
+    const key = "custom-" + label.toLowerCase().replace(/[^a-z0-9]+/g, "-").slice(0, 24);
+    if (tabs.some((t) => t.key === key)) return setError("A tab with that name already exists");
+    setTabs([...tabs, { key, label, enabled: true, builtin: false, text: true }]);
+    setNewTabName("");
+    setAddingTab(false);
   };
 
   const submitRefUrl = async () => {
@@ -118,7 +220,7 @@ export default function StartWizard() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ url: refUrl.trim() }),
     });
-    setRefStatus(r.ok ? `✓ Got it — I'll use your website as reference (${r.data?.chars} characters read)` : `✗ ${r.error}`);
+    setRefStatus(r.ok ? `✓ Website read — AI will use it as reference` : `✗ ${r.error}`);
   };
 
   const submitRefDoc = async (files: FileList | null) => {
@@ -126,11 +228,8 @@ export default function StartWizard() {
     setRefStatus("Reading your document…");
     const fd = new FormData();
     fd.append("file", files[0]);
-    const r = await fetchJson<{ chars: number }>(`/api/business/${bizId}/reference`, {
-      method: "POST",
-      body: fd,
-    });
-    setRefStatus(r.ok ? `✓ Got it — I'll use "${files[0].name}" as reference` : `✗ ${r.error}`);
+    const r = await fetchJson<{ chars: number }>(`/api/business/${bizId}/reference`, { method: "POST", body: fd });
+    setRefStatus(r.ok ? `✓ "${files[0].name}" read — AI will use it as reference` : `✗ ${r.error}`);
     if (docRef.current) docRef.current.value = "";
   };
 
@@ -200,190 +299,281 @@ export default function StartWizard() {
     await refreshProducts();
   };
 
-  const patchProduct = async (pid: string, body: Record<string, unknown>) => {
-    await fetchJson(`/api/products/${pid}`, {
+  const draft = (p: Product): Product => ({ ...p, ...(drafts[p.id] || {}) });
+  const setDraft = (id: string, field: string, value: unknown) => {
+    setDrafts((d) => ({ ...d, [id]: { ...(d[id] || {}), [field]: value } }));
+    setSavedIds((s) => { const n = new Set(s); n.delete(id); return n; });
+  };
+
+  const saveProduct = async (id: string) => {
+    const d = drafts[id];
+    if (!d) { setSavedIds((s) => new Set(s).add(id)); return; }
+    const r = await fetchJson(`/api/products/${id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
+      body: JSON.stringify(d),
     });
+    if (r.ok) {
+      setSavedIds((s) => new Set(s).add(id));
+      await refreshProducts();
+    } else setError(r.error);
   };
 
   const stepTitle = [
-    "",
-    "Tell us about your business",
-    "Pick your style",
-    "Choose your pages",
-    "Your story — 3 quick questions",
-    "Add your products & photos",
+    "", "Tell us about your business", "Pick your style", "Choose your pages",
+    "Your story — 3 quick questions", "Add your products & photos",
   ][step];
 
   return (
     <div className="min-h-screen max-w-2xl mx-auto px-6 py-10">
-      <header className="flex items-center justify-between mb-10">
-        <Link href="/" className="font-display text-xl font-semibold">Jhalak</Link>
-        <span className="text-sm text-stone-400">Step {step} of 5</span>
+      <header className="flex items-center justify-between mb-8">
+        <Link href="/" className="font-display text-xl font-semibold text-slate-900">Jhalak</Link>
+        <span className="text-sm text-slate-400">Step {step} of 5</span>
       </header>
 
-      <div className="h-1.5 bg-stone-200 rounded-full mb-10">
-        <div className="h-1.5 bg-amber-700 rounded-full transition-all duration-500"
+      <div className="h-1.5 bg-slate-200 rounded-full mb-8">
+        <div className="h-1.5 bg-blue-600 rounded-full transition-all duration-500"
           style={{ width: `${(step / 5) * 100}%` }} />
       </div>
 
-      <h1 className="font-display text-3xl font-semibold mb-8">{stepTitle}</h1>
+      <h1 className="text-2xl font-bold tracking-tight mb-6">{stepTitle}</h1>
       {error && (
-        <div className="mb-6 rounded-xl bg-red-50 border border-red-200 text-red-700 px-4 py-3 text-sm">
+        <div className="mb-5 rounded-xl bg-red-50 border border-red-200 text-red-700 px-4 py-3 text-sm">
           {error}
         </div>
       )}
 
       {step === 1 && (
-        <div className="step-enter space-y-6">
-          <Field label="Business name *">
+        <div className="step-enter space-y-5">
+          <div>
+            <label className="field-label">Business name *</label>
             <input value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Meera Boutique" className="inp" />
-          </Field>
-          <Field label="What kind of business?">
-            <div className="flex flex-wrap gap-2">
-              {CATEGORIES.map((c) => (
-                <Chip key={c.id} active={category === c.id} onClick={() => setCategory(c.id)} label={c.label} />
+          </div>
+          <div>
+            <label className="field-label">Type of business</label>
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+              {CATEGORIES.map((c) => {
+                const Icon = c.icon;
+                const active = category === c.id;
+                return (
+                  <button key={c.id} onClick={() => setCategory(c.id)}
+                    className={`card flex items-center gap-2 px-3 py-2.5 text-sm cursor-pointer ${
+                      active ? "!border-blue-600 ring-2 ring-blue-600/15 text-blue-700 font-medium" : "text-slate-600"
+                    }`}>
+                    <Icon size={16} className={active ? "text-blue-600" : "text-slate-400"} />
+                    {c.label}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="field-label">City</label>
+              <input value={city} onChange={(e) => setCity(e.target.value)} placeholder="e.g. Jaipur" className="inp" />
+            </div>
+            <div>
+              <label className="field-label">WhatsApp number</label>
+              <input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="10-digit number" className="inp" />
+            </div>
+          </div>
+          <div>
+            <label className="field-label">Website language</label>
+            <div className="flex gap-2">
+              {["english", "hinglish"].map((l) => (
+                <button key={l} onClick={() => setLanguage(l)}
+                  className={`px-4 py-2 rounded-lg text-sm border capitalize cursor-pointer transition ${
+                    language === l ? "bg-blue-600 text-white border-blue-600" : "bg-white border-slate-300 hover:border-blue-400"
+                  }`}>
+                  {l}
+                </button>
               ))}
             </div>
-          </Field>
-          <div className="grid grid-cols-2 gap-4">
-            <Field label="City">
-              <input value={city} onChange={(e) => setCity(e.target.value)} placeholder="e.g. Jaipur" className="inp" />
-            </Field>
-            <Field label="WhatsApp number">
-              <input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="10-digit number" className="inp" />
-            </Field>
           </div>
-          <Field label="Website language">
-            <div className="flex gap-2">
-              <Chip active={language === "english"} onClick={() => setLanguage("english")} label="English" />
-              <Chip active={language === "hinglish"} onClick={() => setLanguage("hinglish")} label="Hinglish" />
-            </div>
-          </Field>
-          <NextBtn onClick={createBusiness} busy={busy} label="Continue" />
+          <button onClick={createBusiness} disabled={busy} className="btn-primary">
+            Continue <ArrowRight size={16} />
+          </button>
         </div>
       )}
 
       {step === 2 && (
         <div className="step-enter space-y-6">
-          <div className="grid sm:grid-cols-2 gap-5">
-            <TemplateCard id="elegant" selected={template === "elegant"} onSelect={saveTemplate}
-              title="Elegant" desc="Warm, premium, classic. For boutiques, salons, designers."
-              preview={
-                <div className="h-40 rounded-lg bg-[#f8f5f0] border border-stone-200 p-4 flex flex-col justify-center items-center">
-                  <div className="font-display text-stone-800 text-lg">Aa</div>
-                  <div className="w-16 h-1 bg-amber-700 rounded my-2" />
-                  <div className="w-24 h-2 bg-stone-300 rounded" />
-                </div>
-              } />
-            <TemplateCard id="bold" selected={template === "bold"} onSelect={saveTemplate}
-              title="Bold" desc="Modern, confident, high-contrast. For gyms, clinics, studios."
-              preview={
-                <div className="h-40 rounded-lg bg-stone-900 p-4 flex flex-col justify-center items-center">
-                  <div className="text-white font-bold text-lg">Aa</div>
-                  <div className="w-16 h-1 bg-violet-500 rounded my-2" />
-                  <div className="w-24 h-2 bg-stone-600 rounded" />
-                </div>
-              } />
+          <div className="card p-4 flex items-center gap-4">
+            <input ref={logoRef} type="file" accept="image/*" className="hidden"
+              onChange={(e) => uploadLogo(e.target.files)} />
+            {logoUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={logoUrl} alt="logo" className="w-14 h-14 rounded-xl object-contain border border-slate-200 bg-white" />
+            ) : (
+              <div className="w-14 h-14 rounded-xl border-2 border-dashed border-slate-300 flex items-center justify-center text-slate-300">
+                <ImagePlus size={20} />
+              </div>
+            )}
+            <div className="flex-1">
+              <p className="text-sm font-semibold">Your logo <span className="font-normal text-slate-400">(optional)</span></p>
+              <p className="text-xs text-slate-500">Shown in your website header. PNG/JPG, max 2MB.</p>
+            </div>
+            <button onClick={() => logoRef.current?.click()} className="btn-secondary !py-2">
+              <Upload size={14} /> {logoUrl ? "Change" : "Upload"}
+            </button>
           </div>
-          <NextBtn onClick={() => setStep(3)} busy={false} label="Continue" />
+
+          <div className="grid sm:grid-cols-2 gap-4">
+            {TEMPLATES.map((t) => (
+              <button key={t.id} onClick={() => saveTemplate(t.id)}
+                className={`text-left card p-3 cursor-pointer ${
+                  template === t.id ? "!border-blue-600 ring-2 ring-blue-600/15" : ""
+                }`}>
+                {t.preview}
+                <div className="mt-2.5 flex items-center justify-between px-0.5">
+                  <span className="font-semibold text-sm">{t.title}</span>
+                  {template === t.id && (
+                    <span className="flex items-center gap-1 text-blue-600 text-xs font-semibold">
+                      <Check size={13} /> Selected
+                    </span>
+                  )}
+                </div>
+                <p className="text-xs text-slate-500 px-0.5 mt-0.5">{t.desc}</p>
+              </button>
+            ))}
+          </div>
+          <p className="text-xs text-slate-400 flex items-center gap-1.5">
+            <LayoutTemplate size={13} /> Colors and fonts are fully adjustable later — in your dashboard or by chat.
+          </p>
+          <div className="flex gap-3">
+            <button onClick={() => setStep(1)} className="btn-secondary"><ArrowLeft size={15} /> Back</button>
+            <button onClick={() => setStep(3)} className="btn-primary">Continue <ArrowRight size={16} /></button>
+          </div>
         </div>
       )}
 
       {step === 3 && (
-        <div className="step-enter space-y-8">
-          <div>
-            <p className="text-sm text-stone-500 mb-4">
-              Tick the pages you want on your website — you can change this anytime.
-            </p>
-            <div className="space-y-3">
-              {STANDARD_TABS.map((t) => (
-                <button key={t.id} onClick={() => setTabs({ ...tabs, [t.id]: !tabs[t.id] })}
-                  className={`w-full flex items-start gap-3 rounded-2xl border-2 p-4 text-left transition ${
-                    tabs[t.id] ? "border-amber-700 bg-amber-50/40" : "border-stone-200 bg-white hover:border-stone-400"
+        <div className="step-enter space-y-6">
+          <p className="text-sm text-slate-500 -mt-2">
+            Tick the pages you want. <Pencil size={12} className="inline" /> to rename any page — or add your own.
+          </p>
+          <div className="space-y-2">
+            {tabs.map((t) => (
+              <div key={t.key}
+                className={`card flex items-center gap-3 px-4 py-3 ${t.enabled ? "!border-blue-600/40 bg-blue-50/30" : ""}`}>
+                <button
+                  onClick={() => setTabs(tabs.map((x) => (x.key === t.key ? { ...x, enabled: !x.enabled } : x)))}
+                  aria-label={t.enabled ? "Disable" : "Enable"}
+                  className={`w-5 h-5 rounded flex items-center justify-center cursor-pointer transition ${
+                    t.enabled ? "bg-blue-600 text-white" : "border-2 border-slate-300"
                   }`}>
-                  <span className={`mt-0.5 w-6 h-6 rounded-md flex items-center justify-center text-sm font-bold shrink-0 ${
-                    tabs[t.id] ? "bg-amber-700 text-white" : "border-2 border-stone-300 text-transparent"
-                  }`}>✓</span>
-                  <span>
-                    <span className="font-semibold block">{t.label}</span>
-                    <span className="text-sm text-stone-500">{t.desc}</span>
-                  </span>
+                  {t.enabled && <Check size={13} />}
                 </button>
-              ))}
-            </div>
+                {editingTab === t.key ? (
+                  <input
+                    autoFocus defaultValue={t.label}
+                    onBlur={(e) => {
+                      const label = e.target.value.trim() || t.label;
+                      setTabs(tabs.map((x) => (x.key === t.key ? { ...x, label } : x)));
+                      setEditingTab(null);
+                    }}
+                    onKeyDown={(e) => e.key === "Enter" && (e.target as HTMLInputElement).blur()}
+                    className="flex-1 text-sm font-medium border-b border-blue-400 outline-none bg-transparent"
+                  />
+                ) : (
+                  <span className="flex-1 text-sm font-medium">{t.label}
+                    {t.text && <span className="ml-2 text-[11px] text-slate-400 font-normal">text page</span>}
+                  </span>
+                )}
+                <button onClick={() => setEditingTab(t.key)} aria-label="Rename"
+                  className="text-slate-400 hover:text-blue-600 cursor-pointer transition">
+                  <Pencil size={14} />
+                </button>
+                {!t.builtin && (
+                  <button onClick={() => setTabs(tabs.filter((x) => x.key !== t.key))} aria-label="Remove"
+                    className="text-slate-400 hover:text-red-500 cursor-pointer transition">
+                    <X size={15} />
+                  </button>
+                )}
+              </div>
+            ))}
+            {addingTab ? (
+              <div className="card flex items-center gap-3 px-4 py-3 !border-blue-400">
+                <Plus size={16} className="text-blue-600" />
+                <input autoFocus value={newTabName} onChange={(e) => setNewTabName(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && addCustomTab()}
+                  placeholder="Tab name, e.g. Workshops" className="flex-1 text-sm outline-none bg-transparent" />
+                <button onClick={addCustomTab} className="text-sm font-semibold text-blue-600 cursor-pointer">Add</button>
+                <button onClick={() => setAddingTab(false)} className="text-slate-400 cursor-pointer"><X size={15} /></button>
+              </div>
+            ) : (
+              <button onClick={() => setAddingTab(true)}
+                className="w-full card flex items-center justify-center gap-2 px-4 py-3 text-sm text-slate-500 hover:text-blue-600 cursor-pointer border-dashed">
+                <Plus size={15} /> Add your own tab
+              </button>
+            )}
           </div>
 
-          <div className="rounded-2xl bg-white border border-stone-200 p-5 space-y-4">
-            <p className="font-semibold text-sm">
-              Already have a website, brochure or Instagram? <span className="font-normal text-stone-500">(optional — AI will use it while writing your site)</span>
+          <div className="card p-4 space-y-3">
+            <p className="text-sm font-semibold flex items-center gap-2">
+              <Globe size={15} className="text-blue-600" />
+              Have an existing website or brochure?
+              <span className="font-normal text-slate-400">(optional)</span>
             </p>
             <div className="flex gap-2">
               <input value={refUrl} onChange={(e) => setRefUrl(e.target.value)}
                 placeholder="https://your-old-website.com" className="inp flex-1" />
-              <button onClick={submitRefUrl}
-                className="rounded-full border border-stone-300 px-4 py-2 text-sm hover:border-stone-500 transition shrink-0">
-                Read it
-              </button>
+              <button onClick={submitRefUrl} className="btn-secondary shrink-0 !py-2">Read it</button>
             </div>
-            <div className="flex items-center gap-3">
-              <input ref={docRef} type="file" accept=".pdf,.txt,.md,text/plain,application/pdf"
-                className="hidden" onChange={(e) => submitRefDoc(e.target.files)} />
-              <button onClick={() => docRef.current?.click()}
-                className="rounded-full border border-stone-300 px-4 py-2 text-sm hover:border-stone-500 transition">
-                📄 Upload a document (PDF / text)
-              </button>
-            </div>
-            {refStatus && <p className="text-sm text-stone-600">{refStatus}</p>}
+            <input ref={docRef} type="file" accept=".pdf,.txt,.md,text/plain,application/pdf"
+              className="hidden" onChange={(e) => submitRefDoc(e.target.files)} />
+            <button onClick={() => docRef.current?.click()} className="btn-secondary !py-2">
+              <FileText size={14} /> Upload a document (PDF / text)
+            </button>
+            {refStatus && <p className="text-sm text-slate-600">{refStatus}</p>}
           </div>
 
           <div className="flex gap-3">
-            <BackBtn onClick={() => setStep(2)} />
-            <NextBtn onClick={saveStructure} busy={busy} label="Continue" />
+            <button onClick={() => setStep(2)} className="btn-secondary"><ArrowLeft size={15} /> Back</button>
+            <button onClick={saveStructure} disabled={busy} className="btn-primary">Continue <ArrowRight size={16} /></button>
           </div>
         </div>
       )}
 
       {step === 4 && (
-        <div className="step-enter space-y-6">
+        <div className="step-enter space-y-5">
           {!copy ? (
             <>
-              <Field label="1. What do you offer?">
-                <textarea value={offering} onChange={(e) => setOffering(e.target.value)} rows={2}
-                  placeholder="e.g. Designer sarees and lehengas, custom stitching" className="inp" />
-              </Field>
-              <Field label="2. What makes you special?">
-                <textarea value={special} onChange={(e) => setSpecial(e.target.value)} rows={2}
-                  placeholder="e.g. 20 years of experience, everything handmade" className="inp" />
-              </Field>
-              <Field label="3. What should visitors do?">
-                <textarea value={action} onChange={(e) => setAction(e.target.value)} rows={2}
-                  placeholder="e.g. Message us on WhatsApp to book a visit" className="inp" />
-              </Field>
+              {[
+                { label: "1. What do you offer?", v: offering, set: setOffering, ph: "e.g. Designer sarees and lehengas, custom stitching" },
+                { label: "2. What makes you special?", v: special, set: setSpecial, ph: "e.g. 20 years of experience, everything handmade" },
+                { label: "3. What should visitors do?", v: action, set: setAction, ph: "e.g. Message us on WhatsApp to book a visit" },
+              ].map((f) => (
+                <div key={f.label}>
+                  <label className="field-label">{f.label}</label>
+                  <textarea value={f.v} onChange={(e) => f.set(e.target.value)} rows={2} placeholder={f.ph} className="inp" />
+                </div>
+              ))}
               <div className="flex gap-3">
-                <BackBtn onClick={() => setStep(3)} />
-                <NextBtn onClick={generateCopy} busy={busy} label={busy ? "Writing your website…" : "✨ Write my website"} />
+                <button onClick={() => setStep(3)} className="btn-secondary"><ArrowLeft size={15} /> Back</button>
+                <button onClick={generateCopy} disabled={busy} className="btn-primary">
+                  <Sparkles size={15} /> {busy ? "Writing your website…" : "Write my website"}
+                </button>
               </div>
             </>
           ) : (
             <>
-              <p className="text-sm text-stone-500 -mt-2">Here is what we wrote. Tap any text to edit — you can also refine it by chat in the next step.</p>
-              <Field label="Headline">
-                <input value={copy.headline} onChange={(e) => setCopy({ ...copy, headline: e.target.value })} className="inp font-display text-lg" />
-              </Field>
-              <Field label="Tagline">
+              <p className="text-sm text-slate-500 -mt-1">Here&apos;s what we wrote — edit anything, or refine by chat in the next step.</p>
+              <div>
+                <label className="field-label">Headline</label>
+                <input value={copy.headline} onChange={(e) => setCopy({ ...copy, headline: e.target.value })} className="inp text-lg font-semibold" />
+              </div>
+              <div>
+                <label className="field-label">Tagline</label>
                 <input value={copy.tagline} onChange={(e) => setCopy({ ...copy, tagline: e.target.value })} className="inp" />
-              </Field>
-              <Field label="About">
+              </div>
+              <div>
+                <label className="field-label">About</label>
                 <textarea value={copy.about} onChange={(e) => setCopy({ ...copy, about: e.target.value })} rows={3} className="inp" />
-              </Field>
+              </div>
               <div className="flex gap-3">
-                <button onClick={() => setCopy(null)} className="rounded-full border border-stone-300 px-6 py-3 text-sm hover:border-stone-500 transition">
-                  ↻ Rewrite
-                </button>
-                <NextBtn onClick={saveCopy} busy={busy} label="Looks good — continue" />
+                <button onClick={() => setCopy(null)} className="btn-secondary">↻ Rewrite</button>
+                <button onClick={saveCopy} disabled={busy} className="btn-primary">Looks good — continue <ArrowRight size={16} /></button>
               </div>
             </>
           )}
@@ -391,126 +581,81 @@ export default function StartWizard() {
       )}
 
       {step === 5 && (
-        <div className="step-enter space-y-6">
-          <p className="text-sm text-stone-500 -mt-4">
-            Upload photos — AI writes each item&apos;s name, description and category.
-            Then add price and discount yourself. Everything is editable.
+        <div className="step-enter space-y-5">
+          <p className="text-sm text-slate-500 -mt-2">
+            Upload photos — AI polishes each one and writes its details.
+            <b> Review each card, edit anything, then press Save.</b>
           </p>
           <input ref={fileRef} type="file" accept="image/*" multiple className="hidden"
             onChange={(e) => uploadPhotos(e.target.files)} />
           <button onClick={() => fileRef.current?.click()} disabled={busy}
-            className="w-full rounded-2xl border-2 border-dashed border-stone-300 py-8 text-stone-500 hover:border-amber-700 hover:text-amber-700 transition disabled:opacity-50">
-            {busy ? "Uploading…" : "＋ Tap to add photos"}
+            className="w-full rounded-xl border-2 border-dashed border-slate-300 py-7 text-slate-500 hover:border-blue-500 hover:text-blue-600 transition cursor-pointer disabled:opacity-50 flex items-center justify-center gap-2">
+            <ImagePlus size={18} /> {busy ? "Uploading…" : "Tap to add photos"}
           </button>
 
-          {products.length > 0 && (
-            <div className="space-y-4">
-              {products.map((p) => (
-                <div key={p.id} className="rounded-2xl bg-white border border-stone-200 overflow-hidden flex">
-                  {p.status === "processing" ? (
-                    <div className="w-28 h-28 shrink-0 shimmer" />
+          {products.map((p0) => {
+            const p = draft(p0);
+            const saved = savedIds.has(p.id);
+            const dirty = !!drafts[p.id] && !saved;
+            return (
+              <div key={p.id} className="card overflow-hidden">
+                <div className="flex">
+                  {p0.status === "processing" ? (
+                    <div className="w-32 shrink-0 shimmer min-h-32" />
                   ) : (
                     // eslint-disable-next-line @next/next/no-img-element
-                    <img src={p.processed_url || p.original_url} alt={p.title}
-                      className="w-28 h-28 shrink-0 object-cover" />
+                    <img src={p0.processed_url || p0.original_url} alt={p.title} className="w-32 shrink-0 object-cover" />
                   )}
-                  <div className="p-3 flex-1 min-w-0">
-                    {p.status === "processing" ? (
-                      <p className="text-xs text-stone-400 mt-2">✨ Writing this item&apos;s details…</p>
+                  <div className="p-4 flex-1 min-w-0">
+                    {p0.status === "processing" ? (
+                      <p className="text-xs text-slate-400 flex items-center gap-1.5">
+                        <Sparkles size={13} /> Polishing photo & writing details…
+                      </p>
                     ) : (
-                      <div className="grid grid-cols-2 gap-2">
-                        <input defaultValue={p.title} placeholder="Product name"
-                          onBlur={(e) => patchProduct(p.id, { title: e.target.value })}
-                          className="text-sm font-medium outline-none border-b border-transparent focus:border-stone-300 col-span-1" />
-                        <input defaultValue={p.category} placeholder="Category"
-                          onBlur={(e) => patchProduct(p.id, { category: e.target.value })}
-                          className="text-sm outline-none border-b border-transparent focus:border-stone-300 col-span-1" />
-                        <input defaultValue={p.price_text} placeholder="Price (₹1,499)"
-                          onBlur={(e) => patchProduct(p.id, { price_text: e.target.value })}
-                          className="text-sm outline-none border-b border-transparent focus:border-stone-300 col-span-1" />
-                        <input type="number" min={0} max={90} defaultValue={p.discount_pct || ""} placeholder="Discount %"
-                          onBlur={(e) => patchProduct(p.id, { discount_pct: Number(e.target.value) || 0 })}
-                          className="text-sm outline-none border-b border-transparent focus:border-stone-300 col-span-1" />
-                        <textarea defaultValue={p.description} placeholder="Description" rows={1}
-                          onBlur={(e) => patchProduct(p.id, { description: e.target.value })}
-                          className="text-xs text-stone-500 outline-none resize-none border-b border-transparent focus:border-stone-300 col-span-2" />
+                      <div className="grid grid-cols-2 gap-x-3 gap-y-2.5">
+                        <div>
+                          <label className="field-label !mb-1">Product name</label>
+                          <input value={p.title} onChange={(e) => setDraft(p.id, "title", e.target.value)} className="inp !py-1.5 !text-sm" />
+                        </div>
+                        <div>
+                          <label className="field-label !mb-1">Category</label>
+                          <input value={p.category} onChange={(e) => setDraft(p.id, "category", e.target.value)} className="inp !py-1.5 !text-sm" />
+                        </div>
+                        <div>
+                          <label className="field-label !mb-1">Price</label>
+                          <input value={p.price_text} placeholder="₹1,499" onChange={(e) => setDraft(p.id, "price_text", e.target.value)} className="inp !py-1.5 !text-sm" />
+                        </div>
+                        <div>
+                          <label className="field-label !mb-1">Discount %</label>
+                          <input type="number" min={0} max={90} value={p.discount_pct || ""} placeholder="0"
+                            onChange={(e) => setDraft(p.id, "discount_pct", Number(e.target.value) || 0)} className="inp !py-1.5 !text-sm" />
+                        </div>
+                        <div className="col-span-2">
+                          <label className="field-label !mb-1">Description</label>
+                          <textarea value={p.description} rows={2} onChange={(e) => setDraft(p.id, "description", e.target.value)} className="inp !py-1.5 !text-sm" />
+                        </div>
+                        <div className="col-span-2 flex justify-end">
+                          <button onClick={() => saveProduct(p.id)}
+                            className={saved && !dirty ? "btn-secondary !py-1.5 !text-xs" : "btn-primary !py-1.5 !text-xs"}>
+                            {saved && !dirty ? (<><Check size={13} /> Saved</>) : (<><Save size={13} /> Save</>)}
+                          </button>
+                        </div>
                       </div>
                     )}
                   </div>
                 </div>
-              ))}
-            </div>
-          )}
+              </div>
+            );
+          })}
 
           <div className="flex gap-3">
-            <BackBtn onClick={() => setStep(4)} />
-            <NextBtn onClick={() => router.push(`/studio/${bizId}`)} busy={false}
-              label={products.length ? "Continue → Preview & edit by chat" : "Skip → Preview & edit by chat"} />
+            <button onClick={() => setStep(4)} className="btn-secondary"><ArrowLeft size={15} /> Back</button>
+            <button onClick={() => router.push(`/studio/${bizId}`)} className="btn-primary">
+              {products.length ? "Continue" : "Skip"} — preview & edit by chat <ArrowRight size={16} />
+            </button>
           </div>
-          <p className="text-xs text-stone-400">
-            Next: see your website live, refine it by chatting with AI, then publish.
-          </p>
         </div>
       )}
     </div>
-  );
-}
-
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <label className="block">
-      <span className="block text-sm font-medium text-stone-700 mb-2">{label}</span>
-      {children}
-    </label>
-  );
-}
-
-function Chip({ active, onClick, label }: { active: boolean; onClick: () => void; label: string }) {
-  return (
-    <button onClick={onClick}
-      className={`px-4 py-2 rounded-full text-sm border transition ${
-        active ? "bg-stone-900 text-white border-stone-900" : "bg-white border-stone-300 hover:border-stone-500"
-      }`}>
-      {label}
-    </button>
-  );
-}
-
-function NextBtn({ onClick, busy, label }: { onClick: () => void; busy: boolean; label: string }) {
-  return (
-    <button onClick={onClick} disabled={busy}
-      className="rounded-full bg-amber-700 text-white px-8 py-3.5 font-semibold hover:bg-amber-800 transition disabled:opacity-60 shadow-lg shadow-amber-700/20">
-      {label}
-    </button>
-  );
-}
-
-function BackBtn({ onClick }: { onClick: () => void }) {
-  return (
-    <button onClick={onClick}
-      className="rounded-full border border-stone-300 px-6 py-3 text-sm hover:border-stone-500 transition">
-      Back
-    </button>
-  );
-}
-
-function TemplateCard({
-  id, selected, onSelect, title, desc, preview,
-}: {
-  id: string; selected: boolean; onSelect: (id: string) => void;
-  title: string; desc: string; preview: React.ReactNode;
-}) {
-  return (
-    <button onClick={() => onSelect(id)}
-      className={`text-left rounded-2xl border-2 p-4 transition ${
-        selected ? "border-amber-700 bg-amber-50/40" : "border-stone-200 bg-white hover:border-stone-400"
-      }`}>
-      {preview}
-      <div className="mt-3 flex items-center justify-between">
-        <span className="font-semibold">{title}</span>
-        {selected && <span className="text-amber-700 text-sm font-medium">✓ Selected</span>}
-      </div>
-      <p className="text-sm text-stone-500 mt-1">{desc}</p>
-    </button>
   );
 }

@@ -3,7 +3,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import LeadForm from "./LeadForm";
 import TenantHeader from "./TenantHeader";
-import { loadTenant, theme, waLink, siteTabs, discounted } from "@/lib/tenant";
+import { loadTenant, theme, waLink, enabledTabs, navItems, discounted } from "@/lib/tenant";
 
 export const dynamic = "force-dynamic";
 
@@ -24,8 +24,12 @@ export default async function Site({ params }: { params: Promise<{ slug: string 
   const data = await loadTenant(slug);
   if (!data) notFound();
   const { biz, content, products } = data;
-  const t = theme(biz.template, content.accent);
-  const tabs = siteTabs(content);
+  const t = theme(biz.template, content.accent, content.font);
+  const on = new Set(enabledTabs(content).map((x) => x.key));
+  const tabs = {
+    products: on.has("products"), about: on.has("about"),
+    gallery: on.has("gallery"), contact: on.has("contact"),
+  };
   const wa = waLink(biz);
   const heroImg = products[0]?.processed_url || products[0]?.original_url || "";
   const isService = biz.category !== "boutique";
@@ -40,9 +44,9 @@ export default async function Site({ params }: { params: Promise<{ slug: string 
       )}
 
       <TenantHeader
-        slug={slug} name={biz.name} displayClass={t.display} headerClass={t.header}
-        accentBg={t.accentBg} wa={wa}
-        tabs={{ products: tabs.products && products.length > 0, gallery: tabs.gallery && products.length > 0, contact: tabs.contact }}
+        slug={slug} name={biz.name} logo={biz.logo_url} displayClass={t.display}
+        headerClass={t.header} accentBg={t.accentBg} wa={wa}
+        items={navItems(slug, content, products.length)}
       />
 
       <section className={`${t.hero}`}>

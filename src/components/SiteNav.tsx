@@ -13,7 +13,7 @@ const TABS = [
 export default function SiteNav() {
   const path = usePathname();
   return (
-    <header className="sticky top-0 z-30 bg-[#faf9f7]/90 backdrop-blur border-b border-stone-200">
+    <header className="sticky top-0 z-30 bg-[#faf9f7]/90 backdrop-blur border-b border-slate-200">
       <div className="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between gap-4">
         <Link href="/" className="font-display text-2xl font-semibold tracking-tight shrink-0">
           Jhalak
@@ -27,8 +27,8 @@ export default function SiteNav() {
                 href={t.href}
                 className={`px-4 py-2 rounded-full text-sm font-medium transition ${
                   active
-                    ? "bg-stone-900 text-white"
-                    : "text-stone-600 hover:text-stone-900 hover:bg-stone-200/60"
+                    ? "bg-slate-900 text-white"
+                    : "text-slate-600 hover:text-slate-900 hover:bg-slate-200/60"
                 }`}
               >
                 {t.label}
@@ -38,7 +38,7 @@ export default function SiteNav() {
         </nav>
         <Link
           href="/start"
-          className="rounded-full bg-amber-700 text-white px-5 py-2.5 text-sm font-semibold hover:bg-amber-800 transition shrink-0"
+          className="rounded-full bg-blue-600 text-white px-5 py-2.5 text-sm font-semibold hover:bg-blue-700 transition shrink-0"
         >
           Create your website
         </Link>
@@ -52,7 +52,7 @@ export default function SiteNav() {
               key={t.href}
               href={t.href}
               className={`shrink-0 px-4 py-1.5 rounded-full text-sm font-medium transition ${
-                active ? "bg-stone-900 text-white" : "text-stone-600 bg-stone-200/60"
+                active ? "bg-slate-900 text-white" : "text-slate-600 bg-slate-200/60"
               }`}
             >
               {t.label}

@@ -2,7 +2,7 @@ import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import TenantHeader from "../TenantHeader";
 import ProductsBrowser from "./ProductsBrowser";
-import { loadTenant, theme, waLink, siteTabs } from "@/lib/tenant";
+import { loadTenant, theme, waLink, navItems } from "@/lib/tenant";
 
 export const dynamic = "force-dynamic";
 
@@ -20,16 +20,15 @@ export default async function ProductsPage({ params }: { params: Promise<{ slug:
   const data = await loadTenant(slug);
   if (!data) notFound();
   const { biz, content, products } = data;
-  const t = theme(biz.template, content.accent);
-  const tabs = siteTabs(content);
+  const t = theme(biz.template, content.accent, content.font);
   const wa = waLink(biz);
 
   return (
     <div className={`min-h-screen ${t.page}`}>
       <TenantHeader
-        slug={slug} name={biz.name} displayClass={t.display} headerClass={t.header}
-        accentBg={t.accentBg} wa={wa}
-        tabs={{ products: true, gallery: tabs.gallery && products.length > 0, contact: tabs.contact }}
+        slug={slug} name={biz.name} logo={biz.logo_url} displayClass={t.display}
+        headerClass={t.header} accentBg={t.accentBg} wa={wa}
+        items={navItems(slug, content, products.length)}
       />
       <main className="max-w-5xl mx-auto px-6 py-12">
         <h1 className={`${t.display} text-3xl mb-2`}>Our Products</h1>

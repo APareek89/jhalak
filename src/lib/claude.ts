@@ -144,19 +144,23 @@ export async function generateProductCopy(
   return tool.input as unknown as ProductCopy;
 }
 
-/** Build the two reel-variant prompts for a product. */
+/** Build the two reel-variant prompts for a product. `brief` = user/inspiration direction. */
 export function reelPrompts(
   product: { title: string; description: string },
-  biz: BusinessBasics
+  biz: BusinessBasics,
+  brief?: string
 ): { variant: string; prompt: string }[] {
+  const direction = brief?.trim()
+    ? `Creative direction from the owner: ${brief.trim()}. `
+    : "";
   return [
     {
       variant: "showcase",
-      prompt: `Slow cinematic showcase of ${product.title} from ${biz.name}. The camera drifts gently around the subject, soft premium studio lighting, shallow depth of field, elegant and calm, Instagram reel style. ${product.description}`,
+      prompt: `${direction}Slow cinematic showcase of ${product.title} from ${biz.name}. The camera drifts gently around the subject, soft premium studio lighting, shallow depth of field, elegant and calm, Instagram reel style. ${product.description}`,
     },
     {
       variant: "promo",
-      prompt: `Energetic promotional reel moment for ${product.title} at ${biz.name}, a ${biz.category} in ${biz.city || "India"}. Warm inviting light, subtle camera push-in, aspirational lifestyle feel, Instagram reel style. ${product.description}`,
+      prompt: `${direction}Energetic promotional reel moment for ${product.title} at ${biz.name}, a ${biz.category} in ${biz.city || "India"}. Warm inviting light, subtle camera push-in, aspirational lifestyle feel, Instagram reel style. ${product.description}`,
     },
   ];
 }
