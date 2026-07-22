@@ -38,3 +38,9 @@
 - **Deepest why (knowledge-gap):** external credential rotated/expired outside our control; second occurrence of credential rot this project (PixelBin earlier).
 - **Action:** showcase seeding switched to Wikimedia Commons images; polish/reels degrade gracefully until a fresh FAL_KEY is set in .env.local AND Render env.
 - **Preventive:** provider() could be extended with a startup key-validity probe + admin banner ("AI provider key invalid") instead of silent per-job failures.
+
+## 2026-07-23 — prod 502 after showcase-carousel deploy (server_failed)
+- **Symptom:** deploy succeeded then instance restarted and crash-looped; site 502 ~15 min.
+- **Why-chain:** carousel duplicated its list for the scroll loop → 8 live iframes on /start → 8 simultaneous SSR tenant-page loads + ~30 bytea media queries → memory spike on the 512MB starter instance → restart → restarted instance failed port scan.
+- **Action:** live iframes only in the first carousel copy; loop copy renders placeholders. Recovered on redeploy.
+- **Preventive (class):** any N× duplication of components that trigger server work must budget the server cost, not just the DOM cost; before real launch either move media to CDN/object storage or bump the plan to 2GB (both already in Pending).
