@@ -18,7 +18,7 @@ const TwitterIcon = ({ size = 12 }: { size?: number }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor"><path d="M18.9 2H22l-6.8 7.8L23 22h-6.3l-4.9-6.4L6.2 22H3l7.3-8.3L1 2h6.5l4.4 5.8L18.9 2zm-1.1 18h1.7L7.4 3.9H5.6L17.8 20z"/></svg>
 );
 import { fetchJson, downscaleImage } from "@/lib/client";
-import AppShell from "@/components/AppShell";
+import AppShell, { type PortfolioSite } from "@/components/AppShell";
 
 type Biz = {
   id: string; slug: string; name: string; category: string; city: string;
@@ -105,6 +105,12 @@ export default function Admin({ params }: { params: Promise<{ id: string }> }) {
   const [reelProduct, setReelProduct] = useState<string | null>(null);
   const [brief, setBrief] = useState("");
   const [reelKind, setReelKind] = useState<"video" | "image">("video");
+  const [portfolio, setPortfolio] = useState<PortfolioSite[]>([]);
+  useEffect(() => {
+    fetchJson<{ businesses: PortfolioSite[] }>("/api/auth/me").then((r) => {
+      if (r.ok && r.data?.businesses) setPortfolio(r.data.businesses);
+    });
+  }, []);
 
   const refresh = useCallback(async () => {
     const r = await fetchJson<{
@@ -271,6 +277,7 @@ export default function Admin({ params }: { params: Promise<{ id: string }> }) {
         badge: t === "Leads" ? leadsCount : undefined,
       }))}
       userName={biz.name}
+      portfolio={{ currentId: id, sites: portfolio.length ? portfolio : [{ id, name: biz.name, slug: biz.slug, status: biz.status }] }}
       breadcrumb={
         <span className="flex items-center gap-2 min-w-0">
           {biz.logo_url && (
@@ -285,6 +292,7 @@ export default function Admin({ params }: { params: Promise<{ id: string }> }) {
       }
       actions={
         <span className="flex items-center gap-2">
+          <Link href="/start" className="btn-secondary !py-1.5 !text-xs hidden sm:inline-flex"><Plus size={13} /> Create Website</Link>
           <Link href={`/studio/${id}`} className="btn-primary !py-1.5 !text-xs"><Wand2 size={13} /> Studio</Link>
           <a href={siteUrl} target="_blank" className="btn-secondary !py-1.5 !text-xs"><ExternalLink size={12} /> View site</a>
         </span>

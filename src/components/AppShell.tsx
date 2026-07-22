@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { LogOut } from "lucide-react";
+import { LogOut, ChevronDown, Plus, Globe } from "lucide-react";
+import { useState } from "react";
 import { fetchJson } from "@/lib/client";
 import { useRouter } from "next/navigation";
 
@@ -15,15 +16,20 @@ export type ShellItem = {
   badge?: number;
 };
 
+export type PortfolioSite = { id: string; name: string; slug: string; status: string };
+
 export default function AppShell({
-  items, breadcrumb, actions, userName, children,
+  items, breadcrumb, actions, userName, children, portfolio,
 }: {
   items: ShellItem[];
   breadcrumb: React.ReactNode;
   actions?: React.ReactNode;
   userName?: string;
   children: React.ReactNode;
+  portfolio?: { currentId?: string; sites: PortfolioSite[] };
 }) {
+  const [portOpen, setPortOpen] = useState(false);
+  const currentSite = portfolio?.sites.find((b) => b.id === portfolio.currentId);
   const router = useRouter();
   const logout = async () => {
     await fetchJson("/api/auth/me", { method: "DELETE" });
@@ -52,7 +58,37 @@ export default function AppShell({
     <div className="min-h-screen flex bg-slate-50">
       {/* sidebar */}
       <aside className="hidden lg:flex w-[210px] shrink-0 bg-slate-950 flex-col p-3 sticky top-0 h-screen">
-        <Link href="/" className="font-display text-white text-lg font-bold px-3 pt-1 pb-5 block">Jhalak</Link>
+        <Link href="/" className="font-display text-white text-lg font-bold px-3 pt-1 pb-4 block">Jhalak</Link>
+        {portfolio && (
+          <div className="relative mb-3">
+            <button onClick={() => setPortOpen(!portOpen)}
+              className="w-full flex items-center gap-2 bg-slate-900 border border-slate-800 rounded-lg px-3 py-2 text-left cursor-pointer hover:border-slate-600 transition">
+              <Globe size={13} className="text-blue-400 shrink-0" />
+              <span className="flex-1 min-w-0">
+                <span className="block text-[10px] text-slate-500 uppercase tracking-wide">My Portfolio</span>
+                <span className="block text-xs text-white font-medium truncate">{currentSite?.name || "My websites"}</span>
+              </span>
+              <ChevronDown size={13} className={`text-slate-500 transition ${portOpen ? "rotate-180" : ""}`} />
+            </button>
+            {portOpen && (
+              <div className="absolute z-30 left-0 right-0 mt-1 bg-slate-900 border border-slate-700 rounded-lg overflow-hidden shadow-xl">
+                {portfolio.sites.map((b) => (
+                  <Link key={b.id} href={`/admin/${b.id}`}
+                    className={`flex items-center justify-between px-3 py-2 text-xs hover:bg-slate-800 transition ${
+                      b.id === portfolio.currentId ? "text-white font-semibold" : "text-slate-300"
+                    }`}>
+                    <span className="truncate">{b.name}</span>
+                    <span className={`ml-2 w-1.5 h-1.5 rounded-full shrink-0 ${b.status === "published" ? "bg-emerald-400" : "bg-amber-400"}`} />
+                  </Link>
+                ))}
+                <Link href="/start"
+                  className="flex items-center gap-1.5 px-3 py-2 text-xs text-blue-400 font-semibold border-t border-slate-800 hover:bg-slate-800 transition">
+                  <Plus size={12} /> New website
+                </Link>
+              </div>
+            )}
+          </div>
+        )}
         <nav className="flex flex-col gap-1">
           {items.map((it) => <Item key={it.label} it={it} />)}
         </nav>

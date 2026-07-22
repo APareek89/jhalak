@@ -32,3 +32,9 @@
 - **Why (deepest, knowledge-gap):** corp MITM proxy — "unable to get local issuer certificate". The interactive shell inherits the CA-bundle env from the user's zsh profile; the preview-server process does not.
 - **Action:** added `NODE_EXTRA_CA_CERTS` + `SSL_CERT_FILE` (system-ca-bundle.pem) to the jhalak-dev entry in the global launch.json; improved mediaai error logging to print `e.cause`.
 - **Preventive:** any NEW local process that makes TLS calls (dev servers, workers, cron) must carry the CA-bundle env vars — this is a machine-wide constraint (see corp-proxy-tls-fix memory). Render/prod is unaffected (no MITM proxy).
+
+## 2026-07-23 — FAL_KEY went invalid mid-session
+- **Symptom:** nano-banana/edit + all fal endpoints → 401 "invalid key credentials"; same key worked 2h earlier (reels generated on prod).
+- **Deepest why (knowledge-gap):** external credential rotated/expired outside our control; second occurrence of credential rot this project (PixelBin earlier).
+- **Action:** showcase seeding switched to Wikimedia Commons images; polish/reels degrade gracefully until a fresh FAL_KEY is set in .env.local AND Render env.
+- **Preventive:** provider() could be extended with a startup key-validity probe + admin banner ("AI provider key invalid") instead of silent per-job failures.
