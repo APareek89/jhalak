@@ -10,6 +10,9 @@ import {
 } from "lucide-react";
 import { fetchJson, downscaleImage } from "@/lib/client";
 import SmartTextarea from "@/components/SmartTextarea";
+import AppShell from "@/components/AppShell";
+import ShowcaseCarousel from "@/components/ShowcaseCarousel";
+import { LayoutDashboard, Package, Clapperboard, Inbox, Wand2 } from "lucide-react";
 
 type SiteCopy = {
   headline: string; tagline: string; about: string;
@@ -139,6 +142,24 @@ export default function StartWizard() {
   const logoRef = useRef<HTMLInputElement>(null);
 
   const [template, setTemplate] = useState("elegant");
+  const [accent, setAccent] = useState("amber");
+  const [me, setMe] = useState<{ user: { name: string } | null; businesses?: { id: string }[] } | null>(null);
+  useEffect(() => {
+    fetchJson<{ user: { name: string } | null; businesses?: { id: string }[] }>("/api/auth/me")
+      .then((r) => { if (r.ok && r.data) setMe(r.data); });
+  }, []);
+
+  const pickStyle = async (t: string, a: string) => {
+    setTemplate(t);
+    setAccent(a);
+    if (bizId) {
+      await fetchJson(`/api/business/${bizId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ template: t, content: { accent: a } }),
+      });
+    }
+  };
 
   const [tabs, setTabs] = useState<Tab[]>(DEFAULT_TABS);
   const [editingTab, setEditingTab] = useState<string | null>(null);
@@ -184,21 +205,14 @@ export default function StartWizard() {
     if (logoRef.current) logoRef.current.value = "";
   };
 
-  const saveTemplate = async (t: string) => {
-    setTemplate(t);
-    await fetchJson(`/api/business/${bizId}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ template: t }),
-    });
-  };
+  const saveTemplate = (t: string) => pickStyle(t, accent);
 
   const saveStructure = async () => {
     setBusy(true);
     await fetchJson(`/api/business/${bizId}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ content: { tabs_config: tabs } }),
+      body: JSON.stringify({ content: { tabs_config: tabs, accent } }),
     });
     setBusy(false);
     setStep(4);
@@ -326,54 +340,27 @@ export default function StartWizard() {
     "Your story — 3 quick questions", "Add your products & photos",
   ][step];
 
-  const STEP_META = [
-    { n: 1, t: "Business basics", icon: Store },
-    { n: 2, t: "Style & logo", icon: LayoutTemplate },
-    { n: 3, t: "Pages", icon: Check },
-    { n: 4, t: "Your story", icon: Sparkles },
-    { n: 5, t: "Products & photos", icon: ImagePlus },
+  const shellItems = [
+    { label: "Create website", icon: Sparkles, active: true },
+    { label: "Dashboard", icon: LayoutDashboard, href: me?.businesses?.[0] ? `/admin/${me.businesses[0].id}` : undefined, disabled: !me?.businesses?.[0] },
+    { label: "Catalogue", icon: Package, href: me?.businesses?.[0] ? `/admin/${me.businesses[0].id}?tab=Catalogue` : undefined, disabled: !me?.businesses?.[0] },
+    { label: "Reels studio", icon: Clapperboard, href: me?.businesses?.[0] ? `/admin/${me.businesses[0].id}?tab=Reels` : undefined, disabled: !me?.businesses?.[0] },
+    { label: "Leads", icon: Inbox, href: me?.businesses?.[0] ? `/admin/${me.businesses[0].id}?tab=Leads` : undefined, disabled: !me?.businesses?.[0] },
+    ...(bizId ? [{ label: "Studio", icon: Wand2, href: `/studio/${bizId}` }] : []),
   ];
 
   return (
-    <div className="min-h-screen max-w-5xl mx-auto px-4 sm:px-6 py-6 sm:py-10">
-      <header className="flex items-center justify-between mb-5">
-        <Link href="/" className="font-display text-xl font-semibold text-slate-900">Jhalak</Link>
-        <span className="text-sm text-slate-400 md:hidden">Step {step} of 5</span>
-      </header>
-
-      <div className="h-1.5 bg-slate-200 rounded-full mb-6 md:hidden">
-        <div className="h-1.5 bg-blue-600 rounded-full transition-all duration-500"
-          style={{ width: `${(step / 5) * 100}%` }} />
-      </div>
-
-      <div className="md:grid md:grid-cols-[230px_1fr] md:gap-8">
-        <aside className="hidden md:block">
-          <div className="card p-4 sticky top-6">
-            {STEP_META.map((m) => {
-              const Icon = m.icon;
-              const state = step === m.n ? "current" : step > m.n ? "done" : "todo";
-              return (
-                <div key={m.n} className="flex items-center gap-3 py-2.5">
-                  <span className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold transition ${
-                    state === "done" ? "bg-emerald-100 text-emerald-700"
-                    : state === "current" ? "bg-blue-600 text-white shadow-md shadow-blue-600/30"
-                    : "bg-slate-100 text-slate-400"
-                  }`}>
-                    {state === "done" ? <Check size={13} /> : <Icon size={13} />}
-                  </span>
-                  <span className={`text-sm ${state === "current" ? "font-semibold text-slate-900" : "text-slate-500"}`}>
-                    {m.t}
-                  </span>
-                </div>
-              );
-            })}
-            <div className="mt-3 pt-3 border-t border-slate-100 text-xs text-slate-400 leading-5">
-              Next: preview your website and refine it by chatting with AI.
-            </div>
-          </div>
-        </aside>
-
-        <div className="min-w-0">
+    <AppShell
+      items={shellItems}
+      userName={me?.user?.name || undefined}
+      breadcrumb={<span>Create website <span className="mx-1 text-slate-300">›</span> <b className="text-slate-800">Step {step} of 5</b> — {stepTitle}</span>}
+    >
+      <div className="px-4 sm:px-6 py-6">
+        <div className="h-1 bg-slate-200 rounded-full mb-6 max-w-3xl">
+          <div className="h-1 bg-blue-600 rounded-full transition-all duration-500" style={{ width: `${(step / 5) * 100}%` }} />
+        </div>
+        <div className="grid xl:grid-cols-[minmax(0,1fr)_310px] gap-6 items-start">
+        <div className="min-w-0 card p-5 sm:p-6">
         <h1 className="text-2xl font-bold tracking-tight mb-6">{stepTitle}</h1>
       {error && (
         <div className="mb-5 rounded-xl bg-red-50 border border-red-200 text-red-700 px-4 py-3 text-sm">
@@ -702,7 +689,11 @@ export default function StartWizard() {
         </div>
       )}
         </div>
+        <div className="hidden xl:block sticky top-[70px] h-[calc(100vh-100px)]">
+          <ShowcaseCarousel onPick={pickStyle} current={`${template}-${accent}`} />
+        </div>
+        </div>
       </div>
-    </div>
+    </AppShell>
   );
 }

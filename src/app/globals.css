@@ -114,6 +114,21 @@ body {
   to { background-position: -200% 0; }
 }
 
+.carousel-track {
+  animation: carouselScroll 36s linear infinite;
+}
+.carousel-track:hover {
+  animation-play-state: paused;
+}
+@keyframes carouselScroll {
+  from { transform: translateY(0); }
+  to { transform: translateY(-50%); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .carousel-track { animation: none; }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .step-enter, .shimmer { animation: none; }
   .card, .btn-primary, .btn-secondary, .inp, .adm-inp { transition: none; }

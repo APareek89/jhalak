@@ -18,6 +18,7 @@ const TwitterIcon = ({ size = 12 }: { size?: number }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor"><path d="M18.9 2H22l-6.8 7.8L23 22h-6.3l-4.9-6.4L6.2 22H3l7.3-8.3L1 2h6.5l4.4 5.8L18.9 2zm-1.1 18h1.7L7.4 3.9H5.6L17.8 20z"/></svg>
 );
 import { fetchJson, downscaleImage } from "@/lib/client";
+import AppShell from "@/components/AppShell";
 
 type Biz = {
   id: string; slug: string; name: string; category: string; city: string;
@@ -125,6 +126,12 @@ export default function Admin({ params }: { params: Promise<{ id: string }> }) {
   }, [id]);
 
   useEffect(() => { refresh(); }, [refresh]);
+
+  // deep link: /admin/[id]?tab=Catalogue
+  useEffect(() => {
+    const t = new URLSearchParams(window.location.search).get("tab");
+    if (t && NAV.some((n) => n.id === t)) setTab(t as (typeof NAV)[number]["id"]);
+  }, []);
 
   useEffect(() => {
     const working = products.some((p) => p.status === "processing") || reels.some((r) => r.status === "generating");
@@ -255,48 +262,34 @@ export default function Admin({ params }: { params: Promise<{ id: string }> }) {
   const packsLeft = 2 - quota.reel_packs_used;
 
   return (
-    <div className="min-h-screen bg-slate-50">
-      <header className="bg-white border-b border-slate-200 sticky top-0 z-20">
-        <div className="max-w-6xl mx-auto px-5 py-3 flex items-center justify-between">
-          <div className="flex items-center gap-2.5 min-w-0">
-            <Link href="/" className="font-display text-lg font-semibold shrink-0">Jhalak</Link>
-            <span className="text-slate-300">/</span>
-            {biz.logo_url && (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img src={biz.logo_url} alt="" className="w-7 h-7 rounded-md object-contain border border-slate-200" />
-            )}
-            <span className="font-semibold truncate">{biz.name}</span>
-            <span className={`text-xs px-2 py-0.5 rounded-full shrink-0 ${
-              biz.status === "published" ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700"
-            }`}>
-              {biz.status}
-            </span>
-          </div>
-          <div className="flex items-center gap-2 shrink-0">
-            <Link href={`/studio/${id}`} className="btn-primary !py-2 !text-xs">
-              <Wand2 size={14} /> Studio
-            </Link>
-            <a href={siteUrl} target="_blank" className="btn-secondary !py-2 !text-xs">
-              <ExternalLink size={13} /> View site
-            </a>
-          </div>
-        </div>
-        <nav className="max-w-6xl mx-auto px-5 flex gap-0.5 overflow-x-auto">
-          {NAV.map(({ id: t, icon: Icon }) => (
-            <button key={t} onClick={() => setTab(t)}
-              className={`flex items-center gap-1.5 px-3.5 py-2.5 text-sm font-medium border-b-2 cursor-pointer transition ${
-                tab === t ? "border-blue-600 text-blue-700" : "border-transparent text-slate-500 hover:text-slate-800"
-              }`}>
-              <Icon size={15} />
-              {t}
-              {t === "Leads" && leadsCount > 0 && (
-                <span className="text-[11px] bg-blue-600 text-white rounded-full px-1.5 py-0.5">{leadsCount}</span>
-              )}
-            </button>
-          ))}
-        </nav>
-      </header>
-
+    <AppShell
+      items={NAV.map(({ id: t, icon }) => ({
+        label: t,
+        icon,
+        active: tab === t,
+        onClick: () => setTab(t),
+        badge: t === "Leads" ? leadsCount : undefined,
+      }))}
+      userName={biz.name}
+      breadcrumb={
+        <span className="flex items-center gap-2 min-w-0">
+          {biz.logo_url && (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={biz.logo_url} alt="" className="w-6 h-6 rounded-md object-contain border border-slate-200" />
+          )}
+          <b className="text-slate-800 truncate">{biz.name}</b>
+          <span className={`text-xs px-2 py-0.5 rounded-full shrink-0 ${
+            biz.status === "published" ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700"
+          }`}>{biz.status}</span>
+        </span>
+      }
+      actions={
+        <span className="flex items-center gap-2">
+          <Link href={`/studio/${id}`} className="btn-primary !py-1.5 !text-xs"><Wand2 size={13} /> Studio</Link>
+          <a href={siteUrl} target="_blank" className="btn-secondary !py-1.5 !text-xs"><ExternalLink size={12} /> View site</a>
+        </span>
+      }
+    >
       {toast && (
         <div className="fixed top-24 right-5 z-50 bg-slate-900 text-white text-sm px-4 py-2.5 rounded-xl shadow-lg">
           {toast}
@@ -807,7 +800,7 @@ export default function Admin({ params }: { params: Promise<{ id: string }> }) {
           </div>
         )}
       </main>
-    </div>
+    </AppShell>
   );
 }
 
