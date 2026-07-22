@@ -26,3 +26,9 @@
   May–June" but tokens were rotated upstream.
 - **Preventive:** provider abstraction with graceful OFF mode; never hard-depend on a
   single media provider; verify credentials at session start before promising features.
+
+## 2026-07-22 — fal polish "fetch failed" only inside the dev server (local)
+- **Symptom:** fal.ai calls worked in plain shell node but failed with "fetch failed" inside the Next dev server; polish silently fell back to originals.
+- **Why (deepest, knowledge-gap):** corp MITM proxy — "unable to get local issuer certificate". The interactive shell inherits the CA-bundle env from the user's zsh profile; the preview-server process does not.
+- **Action:** added `NODE_EXTRA_CA_CERTS` + `SSL_CERT_FILE` (system-ca-bundle.pem) to the jhalak-dev entry in the global launch.json; improved mediaai error logging to print `e.cause`.
+- **Preventive:** any NEW local process that makes TLS calls (dev servers, workers, cron) must carry the CA-bundle env vars — this is a machine-wide constraint (see corp-proxy-tls-fix memory). Render/prod is unaffected (no MITM proxy).

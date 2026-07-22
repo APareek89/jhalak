@@ -133,7 +133,12 @@ export async function polishImage(
     }
     return null;
   } catch (e) {
-    console.error("[mediaai] polish failed:", e instanceof Error ? e.message : e);
+    const cause = (e as { cause?: { message?: string; code?: string } })?.cause;
+    console.error(
+      "[mediaai] polish failed:",
+      e instanceof Error ? e.message : e,
+      cause ? `| cause: ${cause.message || cause.code}` : ""
+    );
     return null;
   }
 }
