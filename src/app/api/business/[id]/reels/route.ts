@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { q } from "@/lib/db";
+import { canManageBusiness } from "@/lib/auth";
 import { generateReelPack } from "@/lib/jobs";
 import { provider } from "@/lib/mediaai";
 
@@ -7,6 +8,9 @@ const MAX_REEL_PACKS = 2; // hard cost cap per business in this preview
 
 export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
   const { id } = await ctx.params;
+    if (!(await canManageBusiness(id))) {
+      return NextResponse.json({ error: "Please log in as the owner of this business.", auth: true }, { status: 403 });
+    }
   try {
     if (provider() === "off") {
       return NextResponse.json(
@@ -14,7 +18,7 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string
         { status: 503 }
       );
     }
-    const { product_id, brief } = await req.json();
+    const { product_id, brief, kind } = await req.json();
     const biz = await q<{ name: string; category: string; city: string; language: string }>(
       `select name, category, city, language from jhalak.businesses where id=$1`, [id]
     );
@@ -47,7 +51,8 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string
       id,
       { id: p.id, title: p.title, description: p.description, image_media_id: imageMediaId },
       biz[0],
-      typeof brief === "string" ? brief.slice(0, 600) : undefined
+      typeof brief === "string" ? brief.slice(0, 600) : undefined,
+      kind === "image" ? "image" : "video"
     );
     return NextResponse.json({ ok: true, note: "Reel pack generating — takes 1-4 minutes." });
   } catch (e) {

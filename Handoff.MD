@@ -17,11 +17,12 @@ last-synced: f667339
   (Home / Website / Catalogue Manager / Social Media Marketing).
 
 ## Pending
-1. Owner review feedback round (this session).
-2. Add FAL_KEY (or fresh PixelBin token) on Render → lights up photo polish + reels.
-3. Owner auth for /admin before any real user touches it (accepted risk for preview).
-4. Offer the Loop (Loop.MD status: waiting_for_first_draft → draft exists; make the 2c offer).
-5. Media at scale: move bytea → object storage/CDN before real launch.
+1. **Phase 2 — real social posting APIs** (Instagram Graph, Facebook Pages, X API): today the reel share row uses share-links/deep-links only (WhatsApp/FB/X share URLs, IG opens app — user downloads then uploads). Owner decided integration is Phase 2.
+2. Phase 2 — dedicated STT model for voice input (today: browser Web Speech API, en-IN/hi-IN).
+3. Offer the Loop (Loop.MD status: waiting_for_first_draft; make the 2c offer).
+4. Media at scale: move bytea → object storage/CDN before real launch.
+5. Email verification + password reset for auth (MVP has none).
+6. Demo tenants remain ownerless (open admin) for the feedback link — claim/lock before real launch.
 
 ## Decisions
 - 2026-07-22 — No checkout/payments in v1; enquiry-first (WhatsApp/call/lead form) — owner.

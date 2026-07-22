@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
 import { q } from "@/lib/db";
+import { canManageBusiness } from "@/lib/auth";
 import { ACCENTS } from "@/lib/tenant";
 
 const MODEL = "claude-sonnet-4-6";
@@ -36,7 +37,7 @@ const TOOLS: Anthropic.Tool[] = [
     description: "Switch the visual template.",
     input_schema: {
       type: "object",
-      properties: { template: { type: "string", enum: ["elegant", "bold"] } },
+      properties: { template: { type: "string", enum: ["elegant", "bold", "professional", "minimal"] } },
       required: ["template"],
     },
   },
@@ -179,6 +180,9 @@ async function runTool(bizId: string, name: string, input: ToolInput): Promise<s
 export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await ctx.params;
+    if (!(await canManageBusiness(id))) {
+      return NextResponse.json({ error: "Please log in as the owner of this business.", auth: true }, { status: 403 });
+    }
     const { messages } = (await req.json()) as {
       messages: { role: "user" | "assistant"; content: string }[];
     };
@@ -196,7 +200,7 @@ ${JSON.stringify(state, null, 1).slice(0, 6000)}
 Rules:
 - Keep copy premium and warm; match the owner's language (English or Hinglish — mirror how they write to you).
 - Small, precise edits — only change what was asked.
-- Accent colors available: ${Object.keys(ACCENTS).join(", ")}. Templates: elegant, bold.
+- Accent colors available: ${Object.keys(ACCENTS).join(", ")}. Templates: elegant, bold, professional, minimal.
 - Publish ONLY when explicitly asked.
 - After making changes, reply in 1-3 short sentences describing what changed. No markdown headers, no lists unless asked.
 - If a request is impossible with your tools (e.g. new page types, fonts, videos), say so honestly and suggest the closest thing you CAN do.`;

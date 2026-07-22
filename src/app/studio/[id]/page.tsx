@@ -3,6 +3,7 @@
 import { use, useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { fetchJson } from "@/lib/client";
+import { MicButton } from "@/components/SmartTextarea";
 
 type Msg = { role: "user" | "assistant"; content: string };
 
@@ -24,6 +25,7 @@ export default function Studio({ params }: { params: Promise<{ id: string }> }) 
   const [busy, setBusy] = useState(false);
   const [version, setVersion] = useState(1);
   const [published, setPublished] = useState(false);
+  const [mobileView, setMobileView] = useState<"chat" | "preview">("chat");
   const chatEnd = useRef<HTMLDivElement>(null);
 
   const load = useCallback(async () => {
@@ -105,9 +107,19 @@ export default function Studio({ params }: { params: Promise<{ id: string }> }) 
         </div>
       </header>
 
+      <div className="sm:hidden flex border-b border-slate-200 bg-white">
+        {(["chat", "preview"] as const).map((v) => (
+          <button key={v} onClick={() => setMobileView(v)}
+            className={`flex-1 py-2.5 text-sm font-medium capitalize border-b-2 transition ${
+              mobileView === v ? "border-blue-600 text-blue-700" : "border-transparent text-slate-500"
+            }`}>
+            {v === "chat" ? "✏️ Edit by chat" : "👁 Preview"}
+          </button>
+        ))}
+      </div>
       <div className="flex-1 flex min-h-0">
         {/* chat panel */}
-        <div className="w-full sm:w-[420px] shrink-0 flex flex-col border-r border-slate-200 bg-white">
+        <div className={`w-full sm:w-[420px] shrink-0 flex-col border-r border-slate-200 bg-white ${mobileView === "chat" ? "flex" : "hidden sm:flex"}`}>
           <div className="flex-1 overflow-y-auto p-5 space-y-4">
             {!messages.length && (
               <div className="space-y-4">
@@ -153,7 +165,8 @@ export default function Studio({ params }: { params: Promise<{ id: string }> }) 
             <div ref={chatEnd} />
           </div>
           <div className="p-4 border-t border-slate-200">
-            <div className="flex gap-2">
+            <div className="flex gap-2 items-center">
+              <MicButton onText={(t) => setInput((v) => (v ? v + " " : "") + t)} />
               <input
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
@@ -171,7 +184,7 @@ export default function Studio({ params }: { params: Promise<{ id: string }> }) 
         </div>
 
         {/* live preview */}
-        <div className="hidden sm:flex flex-1 flex-col bg-slate-200 p-4">
+        <div className={`flex-1 flex-col bg-slate-200 p-2 sm:p-4 ${mobileView === "preview" ? "flex" : "hidden sm:flex"}`}>
           <div className="flex-1 rounded-2xl overflow-hidden bg-white shadow-xl">
             {slug ? (
               <iframe key={version} src={`/s/${slug}`} className="w-full h-full" title="Website preview" />

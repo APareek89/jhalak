@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { q } from "@/lib/db";
+import { canManageBusiness } from "@/lib/auth";
 import { saveMedia, mediaUrl } from "@/lib/media";
 import { processProductPhoto } from "@/lib/jobs";
 
@@ -8,6 +9,9 @@ const MAX_FILE_BYTES = 8 * 1024 * 1024; // client downscales; this is the hard s
 
 export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
   const { id } = await ctx.params;
+    if (!(await canManageBusiness(id))) {
+      return NextResponse.json({ error: "Please log in as the owner of this business.", auth: true }, { status: 403 });
+    }
   try {
     const biz = await q<{
       id: string; slug: string; name: string; category: string; city: string; language: string;

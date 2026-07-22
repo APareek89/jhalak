@@ -9,6 +9,7 @@ import {
   Globe, FileText, X, Save, LayoutTemplate,
 } from "lucide-react";
 import { fetchJson, downscaleImage } from "@/lib/client";
+import SmartTextarea from "@/components/SmartTextarea";
 
 type SiteCopy = {
   headline: string; tagline: string; about: string;
@@ -167,6 +168,7 @@ export default function StartWizard() {
       body: JSON.stringify({ name, category, city, phone, whatsapp: phone, language, template }),
     });
     setBusy(false);
+    if (r.status === 401) return router.push("/signup?next=/start");
     if (!r.ok || !r.data) return setError(r.error);
     setBizId(r.data.id);
     setStep(2);
@@ -324,19 +326,55 @@ export default function StartWizard() {
     "Your story — 3 quick questions", "Add your products & photos",
   ][step];
 
+  const STEP_META = [
+    { n: 1, t: "Business basics", icon: Store },
+    { n: 2, t: "Style & logo", icon: LayoutTemplate },
+    { n: 3, t: "Pages", icon: Check },
+    { n: 4, t: "Your story", icon: Sparkles },
+    { n: 5, t: "Products & photos", icon: ImagePlus },
+  ];
+
   return (
-    <div className="min-h-screen max-w-2xl mx-auto px-6 py-10">
-      <header className="flex items-center justify-between mb-8">
+    <div className="min-h-screen max-w-5xl mx-auto px-4 sm:px-6 py-6 sm:py-10">
+      <header className="flex items-center justify-between mb-5">
         <Link href="/" className="font-display text-xl font-semibold text-slate-900">Jhalak</Link>
-        <span className="text-sm text-slate-400">Step {step} of 5</span>
+        <span className="text-sm text-slate-400 md:hidden">Step {step} of 5</span>
       </header>
 
-      <div className="h-1.5 bg-slate-200 rounded-full mb-8">
+      <div className="h-1.5 bg-slate-200 rounded-full mb-6 md:hidden">
         <div className="h-1.5 bg-blue-600 rounded-full transition-all duration-500"
           style={{ width: `${(step / 5) * 100}%` }} />
       </div>
 
-      <h1 className="text-2xl font-bold tracking-tight mb-6">{stepTitle}</h1>
+      <div className="md:grid md:grid-cols-[230px_1fr] md:gap-8">
+        <aside className="hidden md:block">
+          <div className="card p-4 sticky top-6">
+            {STEP_META.map((m) => {
+              const Icon = m.icon;
+              const state = step === m.n ? "current" : step > m.n ? "done" : "todo";
+              return (
+                <div key={m.n} className="flex items-center gap-3 py-2.5">
+                  <span className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold transition ${
+                    state === "done" ? "bg-emerald-100 text-emerald-700"
+                    : state === "current" ? "bg-blue-600 text-white shadow-md shadow-blue-600/30"
+                    : "bg-slate-100 text-slate-400"
+                  }`}>
+                    {state === "done" ? <Check size={13} /> : <Icon size={13} />}
+                  </span>
+                  <span className={`text-sm ${state === "current" ? "font-semibold text-slate-900" : "text-slate-500"}`}>
+                    {m.t}
+                  </span>
+                </div>
+              );
+            })}
+            <div className="mt-3 pt-3 border-t border-slate-100 text-xs text-slate-400 leading-5">
+              Next: preview your website and refine it by chatting with AI.
+            </div>
+          </div>
+        </aside>
+
+        <div className="min-w-0">
+        <h1 className="text-2xl font-bold tracking-tight mb-6">{stepTitle}</h1>
       {error && (
         <div className="mb-5 rounded-xl bg-red-50 border border-red-200 text-red-700 px-4 py-3 text-sm">
           {error}
@@ -539,16 +577,23 @@ export default function StartWizard() {
         <div className="step-enter space-y-5">
           {!copy ? (
             <>
-              {[
-                { label: "1. What do you offer?", v: offering, set: setOffering, ph: "e.g. Designer sarees and lehengas, custom stitching" },
-                { label: "2. What makes you special?", v: special, set: setSpecial, ph: "e.g. 20 years of experience, everything handmade" },
-                { label: "3. What should visitors do?", v: action, set: setAction, ph: "e.g. Message us on WhatsApp to book a visit" },
-              ].map((f) => (
-                <div key={f.label}>
-                  <label className="field-label">{f.label}</label>
-                  <textarea value={f.v} onChange={(e) => f.set(e.target.value)} rows={2} placeholder={f.ph} className="inp" />
-                </div>
-              ))}
+              <p className="text-xs text-slate-400 -mt-1 mb-1">
+                Tip: tap the mic to speak your answers — English ya Hinglish, dono chalega. Use ⤢ for a bigger writing space.
+              </p>
+              <SmartTextarea label="1. What do you offer?" value={offering} onChange={setOffering}
+                placeholder="e.g. Designer sarees and lehengas, custom stitching" rows={3} />
+              <SmartTextarea label="2. What makes you special?" value={special} onChange={setSpecial}
+                placeholder="e.g. 20 years of experience, everything handmade" rows={3} />
+              <SmartTextarea label="3. What should visitors do?" value={action} onChange={setAction}
+                placeholder="e.g. Message us on WhatsApp to book a visit" rows={2} />
+              <div className="flex items-center gap-2 text-sm">
+                <input ref={docRef} type="file" accept=".pdf,.txt,.md,text/plain,application/pdf"
+                  className="hidden" onChange={(e) => submitRefDoc(e.target.files)} />
+                <button onClick={() => docRef.current?.click()} className="btn-secondary !py-1.5 !text-xs">
+                  <FileText size={13} /> Attach a document — AI will read it
+                </button>
+                {refStatus && <span className="text-xs text-slate-500">{refStatus}</span>}
+              </div>
               <div className="flex gap-3">
                 <button onClick={() => setStep(3)} className="btn-secondary"><ArrowLeft size={15} /> Back</button>
                 <button onClick={generateCopy} disabled={busy} className="btn-primary">
@@ -656,6 +701,8 @@ export default function StartWizard() {
           </div>
         </div>
       )}
+        </div>
+      </div>
     </div>
   );
 }

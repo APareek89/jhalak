@@ -169,3 +169,27 @@ export async function generateReel(
   }
   throw new Error("no video provider connected");
 }
+
+/** Generate a 9:16 image post from a product image + prompt. Returns /api/media URL. */
+export async function generateImagePost(
+  imageDataUri: string,
+  imagePublicUrl: string,
+  prompt: string
+): Promise<string> {
+  const p = provider();
+  if (p === "fal") {
+    const out = await falRun(FAL_IMAGE_MODEL, {
+      prompt: prompt + " Vertical 9:16 composition.",
+      image_urls: [imageDataUri],
+      aspect_ratio: "9:16",
+    });
+    return persistRemote(firstUrl(out), "image/jpeg");
+  }
+  if (p === "pixelbin") {
+    const out = await pxPredict(process.env.PIXELBIN_IMAGE_MODEL || "nanoBanana2_generate", {
+      prompt, images: [imagePublicUrl], aspect_ratio: "9:16", output_resolution: "1K",
+    });
+    return persistRemote(out, "image/jpeg");
+  }
+  throw new Error("no image provider connected");
+}

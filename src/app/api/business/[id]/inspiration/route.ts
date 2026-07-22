@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
 import { q } from "@/lib/db";
+import { canManageBusiness } from "@/lib/auth";
 
 const MODEL = "claude-sonnet-4-6";
 
@@ -15,11 +16,19 @@ export interface ReelIdea {
 export async function POST(_req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await ctx.params;
+    if (!(await canManageBusiness(id))) {
+      return NextResponse.json({ error: "Please log in as the owner of this business.", auth: true }, { status: 403 });
+    }
     const biz = await q<{ name: string; category: string; city: string }>(
       `select name, category, city from jhalak.businesses where id=$1`, [id]
     );
     if (!biz.length) return NextResponse.json({ error: "not found" }, { status: 404 });
     const b = biz[0];
+    const prods = await q<{ title: string; category: string }>(
+      `select title, category from jhalak.products where business_id=$1 and status='ready' limit 12`, [id]
+    );
+    const catalogue = prods.map((x) => x.title + (x.category ? ` (${x.category})` : "")).join("; ") || "no items yet";
+    const categories = [...new Set(prods.map((x) => x.category).filter(Boolean))].join(", ");
 
     const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
@@ -31,7 +40,7 @@ export async function POST(_req: NextRequest, ctx: { params: Promise<{ id: strin
       messages: [
         {
           role: "user",
-          content: `Search the web for CURRENT trending Instagram reel formats and content ideas for a ${b.category} small business in India (${b.city || "any city"}). Look for what's working right now — trending hooks, formats (before/after, POV, transformation, behind-the-scenes), audio trends, and India-specific angles. Summarize the most promising findings with where you saw them.`,
+          content: `Search the web for CURRENT trending Instagram reel formats and ideas specifically for ${categories || b.category} content in India — e.g. "${(categories || b.category).split(",")[0]} Instagram reel trend India". The business sells: ${catalogue}. Find trends that fit THESE exact products (festive angles, styling, occasion content), not generic marketing advice. Summarize findings with sources.`,
         },
       ],
     });
@@ -74,7 +83,7 @@ export async function POST(_req: NextRequest, ctx: { params: Promise<{ id: strin
       messages: [
         {
           role: "user",
-          content: `Based on this trend research, produce 5-6 concrete Instagram reel ideas for ${b.name}, a ${b.category} in ${b.city || "India"}. Each must work as a SHORT AI-generated product/space reel (no talking heads, no text-heavy edits). Research:\n\n${summary.slice(0, 5000)}`,
+          content: `Produce 5-6 concrete Instagram reel ideas for ${b.name}, a ${b.category} in ${b.city || "India"}. THEIR ACTUAL CATALOGUE: ${catalogue}. RULES: every idea MUST feature one of those actual items by name in its description; it must work as a SHORT AI-generated product reel from a single product photo (no talking heads, no filming required); tie to current trends from the research where relevant. Research:\n\n${summary.slice(0, 5000)}`,
         },
       ],
     });

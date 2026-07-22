@@ -1,9 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { q } from "@/lib/db";
+import { canManageBusiness } from "@/lib/auth";
 import { provider } from "@/lib/mediaai";
 
 export async function GET(_req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
   const { id } = await ctx.params;
+    if (!(await canManageBusiness(id))) {
+      return NextResponse.json({ error: "Please log in as the owner of this business.", auth: true }, { status: 403 });
+    }
   try {
     const biz = await q(`select * from jhalak.businesses where id=$1`, [id]);
     if (!biz.length) return NextResponse.json({ error: "not found" }, { status: 404 });
@@ -32,6 +36,9 @@ const PATCHABLE = ["name", "category", "city", "phone", "whatsapp", "language", 
 
 export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
   const { id } = await ctx.params;
+    if (!(await canManageBusiness(id))) {
+      return NextResponse.json({ error: "Please log in as the owner of this business.", auth: true }, { status: 403 });
+    }
   try {
     const body = await req.json();
     const sets: string[] = [];

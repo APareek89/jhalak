@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { q } from "@/lib/db";
+import { canManageBusiness } from "@/lib/auth";
 
 const MAX_CHARS = 4000;
 const MAX_DOC_BYTES = 10 * 1024 * 1024;
@@ -31,6 +32,9 @@ async function saveReference(bizId: string, text: string, source: string) {
 export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await ctx.params;
+    if (!(await canManageBusiness(id))) {
+      return NextResponse.json({ error: "Please log in as the owner of this business.", auth: true }, { status: 403 });
+    }
     const biz = await q(`select 1 from jhalak.businesses where id=$1`, [id]);
     if (!biz.length) return NextResponse.json({ error: "not found" }, { status: 404 });
 

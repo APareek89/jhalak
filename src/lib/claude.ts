@@ -164,3 +164,34 @@ export function reelPrompts(
     },
   ];
 }
+
+/** Turn the owner's brief + product into a tight generation prompt. Falls back to null. */
+export async function refineReelPrompt(
+  brief: string,
+  product: { title: string; description: string },
+  biz: BusinessBasics,
+  variant: string,
+  kind: "video" | "image"
+): Promise<string | null> {
+  try {
+    const res = await client().messages.create({
+      model: "claude-haiku-4-5-20251001",
+      max_tokens: 300,
+      messages: [{
+        role: "user",
+        content: `Write ONE ${kind === "video" ? "AI video-generation prompt (image-to-video, 6s, 9:16 vertical)" : "AI image-generation prompt (9:16 vertical Instagram creative)"} for this Instagram ${kind === "video" ? "reel" : "post"}.
+
+Business: ${biz.name}, a ${biz.category} in ${biz.city || "India"}.
+Product in the source image: ${product.title}. ${product.description}
+Owner's creative direction (FOLLOW THIS CLOSELY — it is the whole point): ${brief}
+Variant style: ${variant === "showcase" ? "calm premium showcase" : "energetic promo"}.
+
+Rules: describe concrete visuals/motion/lighting/mood that realize the owner's direction with THIS product; no text overlays, no logos, no people's faces; one paragraph, max 60 words. Reply with ONLY the prompt.`,
+      }],
+    });
+    const text = res.content.filter((c) => c.type === "text").map((c) => (c as {text:string}).text).join(" ").trim();
+    return text || null;
+  } catch {
+    return null;
+  }
+}

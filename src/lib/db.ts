@@ -101,6 +101,16 @@ create table if not exists jhalak.media (
 alter table jhalak.products add column if not exists category text not null default '';
 alter table jhalak.products add column if not exists discount_pct int not null default 0;
 alter table jhalak.businesses add column if not exists logo_url text not null default '';
+
+create table if not exists jhalak.users (
+  id uuid primary key default gen_random_uuid(),
+  email text unique not null,
+  name text not null default '',
+  password_hash text not null,
+  created_at timestamptz not null default now()
+);
+alter table jhalak.businesses add column if not exists owner_id uuid references jhalak.users(id);
+alter table jhalak.reels add column if not exists kind text not null default 'video';
 `;
 
 export function ensureSchema(): Promise<void> {

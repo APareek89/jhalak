@@ -1,10 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { q } from "@/lib/db";
+import { canManageBusiness } from "@/lib/auth";
 import { saveMedia, mediaUrl } from "@/lib/media";
 
 export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await ctx.params;
+    if (!(await canManageBusiness(id))) {
+      return NextResponse.json({ error: "Please log in as the owner of this business.", auth: true }, { status: 403 });
+    }
     const biz = await q(`select 1 from jhalak.businesses where id=$1`, [id]);
     if (!biz.length) return NextResponse.json({ error: "not found" }, { status: 404 });
     const form = await req.formData();
@@ -28,6 +32,9 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string
 export async function DELETE(_req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await ctx.params;
+    if (!(await canManageBusiness(id))) {
+      return NextResponse.json({ error: "Please log in as the owner of this business.", auth: true }, { status: 403 });
+    }
     await q(`update jhalak.businesses set logo_url='' where id=$1`, [id]);
     return NextResponse.json({ ok: true });
   } catch (e) {

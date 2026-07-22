@@ -1,6 +1,6 @@
 import { q } from "./db";
-import { polishImage, generateReel } from "./mediaai";
-import { generateProductCopy, reelPrompts, type BusinessBasics } from "./claude";
+import { polishImage, generateReel, generateImagePost } from "./mediaai";
+import { generateProductCopy, reelPrompts, refineReelPrompt, type BusinessBasics } from "./claude";
 import { getMedia, absoluteMediaUrl } from "./media";
 
 /**
@@ -50,14 +50,21 @@ export function generateReelPack(
   businessId: string,
   product: { id: string; title: string; description: string; image_media_id: string },
   biz: BusinessBasics,
-  brief?: string
+  brief?: string,
+  kind: "video" | "image" = "video"
 ): void {
   const prompts = reelPrompts(product, biz, brief);
   prompts.forEach(({ variant, prompt }) => {
     (async () => {
+      // when the owner gave direction, let Claude turn it into a tight generation prompt
+      let genPrompt = prompt;
+      if (brief?.trim()) {
+        const refined = await refineReelPrompt(brief, product, biz, variant, kind);
+        if (refined) genPrompt = refined;
+      }
       const rows = await q<{ id: string }>(
-        `insert into jhalak.reels (business_id, product_id, variant, prompt) values ($1,$2,$3,$4) returning id`,
-        [businessId, product.id, variant, prompt]
+        `insert into jhalak.reels (business_id, product_id, variant, prompt, kind) values ($1,$2,$3,$4,$5) returning id`,
+        [businessId, product.id, variant, genPrompt, kind]
       );
       const reelId = rows[0].id;
       try {
@@ -65,7 +72,9 @@ export function generateReelPack(
         if (!media) throw new Error("image missing");
         const mime = SUPPORTED_MIMES.has(media.mime) ? media.mime : "image/jpeg";
         const dataUri = `data:${mime};base64,${media.bytes.toString("base64")}`;
-        const url = await generateReel(dataUri, absoluteMediaUrl(product.image_media_id), prompt);
+        const url = kind === "image"
+          ? await generateImagePost(dataUri, absoluteMediaUrl(product.image_media_id), genPrompt)
+          : await generateReel(dataUri, absoluteMediaUrl(product.image_media_id), genPrompt);
         await q(`update jhalak.reels set status='ready', video_url=$1 where id=$2`, [url, reelId]);
       } catch (e) {
         await q(`update jhalak.reels set status='failed', error=$1 where id=$2`, [

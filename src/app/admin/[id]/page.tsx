@@ -7,6 +7,16 @@ import {
   Upload, Sparkles, Save, ImagePlus, Trash2, Eye, EyeOff, Lightbulb, Wand2,
   ExternalLink, Copy as CopyIcon, MessageCircle, ChevronDown, ChevronUp, Palette, Type,
 } from "lucide-react";
+
+const InstagramIcon = ({ size = 12 }: { size?: number }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="2" y="2" width="20" height="20" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.5" cy="6.5" r="1" fill="currentColor"/></svg>
+);
+const FacebookIcon = ({ size = 12 }: { size?: number }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor"><path d="M14 8h3V5h-3c-2.2 0-4 1.8-4 4v2H7v3h3v7h3v-7h3l1-3h-4V9c0-.6.4-1 1-1z"/></svg>
+);
+const TwitterIcon = ({ size = 12 }: { size?: number }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor"><path d="M18.9 2H22l-6.8 7.8L23 22h-6.3l-4.9-6.4L6.2 22H3l7.3-8.3L1 2h6.5l4.4 5.8L18.9 2zm-1.1 18h1.7L7.4 3.9H5.6L17.8 20z"/></svg>
+);
 import { fetchJson, downscaleImage } from "@/lib/client";
 
 type Biz = {
@@ -27,7 +37,7 @@ type Product = {
   category: string; discount_pct: number;
   processed_url: string; original_url: string; status: string; visible: boolean; error: string;
 };
-type Reel = { id: string; product_id: string; variant: string; video_url: string; status: string; error: string };
+type Reel = { id: string; product_id: string; variant: string; video_url: string; status: string; error: string; kind: string };
 type Lead = { id: string; name: string; phone: string; message: string; created_at: string };
 type Idea = { title: string; hook: string; description: string; source: string };
 
@@ -93,6 +103,7 @@ export default function Admin({ params }: { params: Promise<{ id: string }> }) {
   const [selectedIdea, setSelectedIdea] = useState<number | null>(null);
   const [reelProduct, setReelProduct] = useState<string | null>(null);
   const [brief, setBrief] = useState("");
+  const [reelKind, setReelKind] = useState<"video" | "image">("video");
 
   const refresh = useCallback(async () => {
     const r = await fetchJson<{
@@ -217,7 +228,7 @@ export default function Admin({ params }: { params: Promise<{ id: string }> }) {
     const r = await fetchJson(`/api/business/${id}/reels`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ product_id: reelProduct, brief }),
+      body: JSON.stringify({ product_id: reelProduct, brief, kind: reelKind }),
     });
     setBusy(false);
     flash(r.ok ? "Generating 2 reels — a few minutes" : r.error);
@@ -379,16 +390,22 @@ export default function Admin({ params }: { params: Promise<{ id: string }> }) {
                           </div>
                           <div className="col-span-2 flex items-center justify-between pt-0.5">
                             <div className="flex items-center gap-2.5">
-                              <button
-                                onClick={() => fetchJson(`/api/products/${p.id}`, {
-                                  method: "PATCH",
-                                  headers: { "Content-Type": "application/json" },
-                                  body: JSON.stringify({ visible: !p0.visible }),
-                                }).then(refresh)}
-                                className={`flex items-center gap-1 text-xs cursor-pointer ${p0.visible ? "text-emerald-600" : "text-slate-400"}`}>
-                                {p0.visible ? <Eye size={13} /> : <EyeOff size={13} />}
-                                {p0.visible ? "Visible" : "Hidden"}
-                              </button>
+                              <label className="flex items-center gap-1.5 text-xs cursor-pointer select-none" title="Show this item on your website">
+                                <button
+                                  role="switch" aria-checked={p0.visible}
+                                  onClick={() => fetchJson(`/api/products/${p.id}`, {
+                                    method: "PATCH",
+                                    headers: { "Content-Type": "application/json" },
+                                    body: JSON.stringify({ visible: !p0.visible }),
+                                  }).then(refresh)}
+                                  className={`w-8 h-4.5 rounded-full relative transition cursor-pointer ${p0.visible ? "bg-emerald-500" : "bg-slate-300"}`}
+                                  style={{ height: "18px" }}>
+                                  <span className={`absolute top-0.5 w-3.5 h-3.5 rounded-full bg-white shadow transition-all ${p0.visible ? "left-4" : "left-0.5"}`} />
+                                </button>
+                                <span className={p0.visible ? "text-emerald-600" : "text-slate-400"}>
+                                  {p0.visible ? "On website" : "Hidden"}
+                                </span>
+                              </label>
                               <button onClick={() => deleteProduct(p.id)} className="flex items-center gap-1 text-xs text-red-500 cursor-pointer">
                                 <Trash2 size={13} /> Delete
                               </button>
@@ -649,6 +666,16 @@ export default function Admin({ params }: { params: Promise<{ id: string }> }) {
               </div>
               {reelProduct && (
                 <div className="mt-3 space-y-3 step-enter">
+                  <div className="flex gap-2">
+                    {([["video", "🎬 Video reel"], ["image", "🖼️ Image post"]] as ["video" | "image", string][]).map(([k, label]) => (
+                      <button key={k} onClick={() => setReelKind(k)}
+                        className={`px-3.5 py-1.5 rounded-lg text-sm border cursor-pointer transition ${
+                          reelKind === k ? "bg-blue-600 text-white border-blue-600" : "bg-white border-slate-300 hover:border-blue-400"
+                        }`}>
+                        {label}
+                      </button>
+                    ))}
+                  </div>
                   <div>
                     <label className="field-label">Describe your reel {selectedIdea !== null && <span className="text-blue-600 normal-case">(from your selected idea — edit freely)</span>}</label>
                     <textarea value={brief} onChange={(e) => setBrief(e.target.value)} rows={3}
@@ -656,7 +683,7 @@ export default function Admin({ params }: { params: Promise<{ id: string }> }) {
                       className="inp !text-sm" />
                   </div>
                   <button onClick={makeReels} disabled={busy} className="btn-primary !text-sm">
-                    <Wand2 size={15} /> {busy ? "Starting…" : "Generate 2 reels"}
+                    <Wand2 size={15} /> {busy ? "Starting…" : reelKind === "image" ? "Generate 2 image posts" : "Generate 2 reels"}
                   </button>
                 </div>
               )}
@@ -668,7 +695,12 @@ export default function Admin({ params }: { params: Promise<{ id: string }> }) {
                 {reels.map((r) => (
                   <div key={r.id} className="card overflow-hidden">
                     {r.status === "ready" ? (
-                      <video src={r.video_url} controls playsInline className="aspect-[9/16] w-full object-cover bg-black" />
+                      r.kind === "image" ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={r.video_url} alt={r.variant} className="aspect-[9/16] w-full object-cover" />
+                      ) : (
+                        <video src={r.video_url} controls playsInline className="aspect-[9/16] w-full object-cover bg-black" />
+                      )
                     ) : r.status === "failed" ? (
                       <div className="aspect-[9/16] flex items-center justify-center text-xs text-red-500 p-4 text-center">
                         Failed: {r.error?.slice(0, 70)}
@@ -678,10 +710,36 @@ export default function Admin({ params }: { params: Promise<{ id: string }> }) {
                         <p className="text-xs text-slate-500">Generating…</p>
                       </div>
                     )}
-                    <div className="p-2.5 flex items-center justify-between">
-                      <span className="text-xs capitalize text-slate-500">{r.variant}</span>
+                    <div className="p-2.5">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs capitalize text-slate-500">{r.variant}{r.kind === "image" ? " · post" : ""}</span>
+                        {r.status === "ready" && (
+                          <a href={r.video_url} download className="text-xs font-semibold text-blue-600">Download ↓</a>
+                        )}
+                      </div>
                       {r.status === "ready" && (
-                        <a href={r.video_url} download className="text-xs font-semibold text-blue-600">Download ↓</a>
+                        <div className="flex items-center gap-1.5 mt-2 pt-2 border-t border-slate-100">
+                          <span className="text-[10px] uppercase tracking-wide text-slate-400 mr-0.5">Post</span>
+                          <a title="Share on WhatsApp" target="_blank"
+                            href={`https://wa.me/?text=${encodeURIComponent((typeof window !== "undefined" ? window.location.origin : "") + r.video_url)}`}
+                            className="w-6 h-6 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center hover:scale-110 transition">
+                            <MessageCircle size={12} />
+                          </a>
+                          <a title="Open Instagram (download first, then upload)" target="_blank" href="https://www.instagram.com/"
+                            className="w-6 h-6 rounded-full bg-pink-50 text-pink-600 flex items-center justify-center hover:scale-110 transition">
+                            <InstagramIcon size={12} />
+                          </a>
+                          <a title="Share on Facebook" target="_blank"
+                            href={`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent((typeof window !== "undefined" ? window.location.origin : "") + r.video_url)}`}
+                            className="w-6 h-6 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center hover:scale-110 transition">
+                            <FacebookIcon size={12} />
+                          </a>
+                          <a title="Share on X" target="_blank"
+                            href={`https://twitter.com/intent/tweet?url=${encodeURIComponent((typeof window !== "undefined" ? window.location.origin : "") + r.video_url)}`}
+                            className="w-6 h-6 rounded-full bg-slate-100 text-slate-700 flex items-center justify-center hover:scale-110 transition">
+                            <TwitterIcon size={12} />
+                          </a>
+                        </div>
                       )}
                     </div>
                   </div>
@@ -693,8 +751,26 @@ export default function Admin({ params }: { params: Promise<{ id: string }> }) {
 
         {tab === "Leads" && (
           <div className="card overflow-hidden">
-            {leads.length ? (
-              <table className="w-full text-sm">
+            {leads.length ? (<>
+              <div className="sm:hidden divide-y divide-slate-100">
+                {leads.map((l) => (
+                  <div key={l.id} className="p-4">
+                    <div className="flex items-center justify-between">
+                      <p className="font-medium text-sm">{l.name || l.phone}</p>
+                      <span className="text-xs text-slate-400">
+                        {new Date(l.created_at).toLocaleDateString("en-IN", { day: "numeric", month: "short" })}
+                      </span>
+                    </div>
+                    <p className="text-xs text-slate-500 mt-1">{l.phone}</p>
+                    {l.message && <p className="text-sm mt-1.5">{l.message}</p>}
+                    <a href={`https://wa.me/${l.phone.replace(/\D/g, "").length === 10 ? "91" : ""}${l.phone.replace(/\D/g, "")}`}
+                      target="_blank" className="inline-flex items-center gap-1 text-xs font-semibold text-emerald-600 mt-2">
+                      <MessageCircle size={13} /> Reply on WhatsApp
+                    </a>
+                  </div>
+                ))}
+              </div>
+              <table className="w-full text-sm hidden sm:table">
                 <thead className="bg-slate-50 text-left text-slate-500">
                   <tr>
                     <th className="px-4 py-2.5 font-medium">Name</th>
@@ -723,7 +799,7 @@ export default function Admin({ params }: { params: Promise<{ id: string }> }) {
                   ))}
                 </tbody>
               </table>
-            ) : (
+            </>) : (
               <p className="text-center text-slate-400 py-14">
                 No enquiries yet — share your website link on WhatsApp Status and Instagram.
               </p>

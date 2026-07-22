@@ -1,8 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { q, slugify } from "@/lib/db";
+import { getSessionUser } from "@/lib/auth";
 
 export async function POST(req: NextRequest) {
   try {
+    const user = await getSessionUser();
+    if (!user) return NextResponse.json({ error: "Please sign up or log in first.", auth: true }, { status: 401 });
     const b = await req.json();
     if (!b.name?.trim()) {
       return NextResponse.json({ error: "Business name is required" }, { status: 400 });
@@ -15,8 +18,8 @@ export async function POST(req: NextRequest) {
       slug = `${base}-${Math.floor(Math.random() * 900 + 100)}`;
     }
     const rows = await q<{ id: string; slug: string }>(
-      `insert into jhalak.businesses (slug, name, category, city, phone, whatsapp, language, template)
-       values ($1,$2,$3,$4,$5,$6,$7,$8) returning id, slug`,
+      `insert into jhalak.businesses (slug, name, category, city, phone, whatsapp, language, template, owner_id)
+       values ($1,$2,$3,$4,$5,$6,$7,$8,$9) returning id, slug`,
       [
         slug,
         b.name.trim(),
@@ -26,6 +29,7 @@ export async function POST(req: NextRequest) {
         b.whatsapp || b.phone || "",
         b.language || "english",
         b.template || "elegant",
+        user.id,
       ]
     );
     await q(`insert into jhalak.quotas (business_id) values ($1) on conflict do nothing`, [
