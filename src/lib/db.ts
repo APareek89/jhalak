@@ -12,8 +12,14 @@ export function getPool(): Pool {
     global._jhalakPool = new Pool({
       connectionString: process.env.DATABASE_URL,
       max: 5,
+      // Supabase's pgbouncer kills idle connections; recycle ours first and keep
+      // sockets alive so we don't get handed dead clients on the next poll.
+      idleTimeoutMillis: 20_000,
+      connectionTimeoutMillis: 10_000,
+      keepAlive: true,
       ssl: { rejectUnauthorized: false },
     });
+    global._jhalakPool.on("error", (e) => console.error("[pg pool]", e.message));
   }
   return global._jhalakPool;
 }
@@ -106,13 +112,30 @@ export function ensureSchema(): Promise<void> {
   return global._jhalakSchemaReady;
 }
 
+// Connection-level failures happen before the statement executes (dead pooled
+// client), so one retry on a fresh client is safe even for writes.
+function isConnectionError(e: unknown): boolean {
+  const msg = e instanceof Error ? e.message : String(e);
+  const code = (e as { code?: string })?.code || "";
+  return (
+    ["ECONNRESET", "ECONNREFUSED", "ETIMEDOUT", "57P01", "XX000"].includes(code) ||
+    /Connection terminated|client has encountered a connection error|Connection ended unexpectedly/i.test(msg)
+  );
+}
+
 export async function q<T = Record<string, unknown>>(
   text: string,
   params: unknown[] = []
 ): Promise<T[]> {
   await ensureSchema();
-  const r = await getPool().query(text, params as never[]);
-  return r.rows as T[];
+  try {
+    const r = await getPool().query(text, params as never[]);
+    return r.rows as T[];
+  } catch (e) {
+    if (!isConnectionError(e)) throw e;
+    const r = await getPool().query(text, params as never[]);
+    return r.rows as T[];
+  }
 }
 
 export function slugify(s: string): string {

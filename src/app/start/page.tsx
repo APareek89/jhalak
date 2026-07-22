@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import QRCode from "qrcode";
+import { fetchJson, downscaleImage } from "@/lib/client";
 
 type SiteCopy = {
   headline: string;
@@ -64,22 +65,16 @@ export default function StartWizard() {
     if (!name.trim()) return setError("Please enter your business name");
     setBusy(true);
     setError("");
-    try {
-      const r = await fetch("/api/business", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name, category, city, phone, whatsapp: phone, language, template }),
-      });
-      const d = await r.json();
-      if (!r.ok) throw new Error(d.error);
-      setBizId(d.id);
-      setSlug(d.slug);
-      setStep(2);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Something went wrong");
-    } finally {
-      setBusy(false);
-    }
+    const r = await fetchJson<{ id: string; slug: string }>("/api/business", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name, category, city, phone, whatsapp: phone, language, template }),
+    });
+    setBusy(false);
+    if (!r.ok || !r.data) return setError(r.error);
+    setBizId(r.data.id);
+    setSlug(r.data.slug);
+    setStep(2);
   };
 
   const saveTemplate = async (t: string) => {
@@ -95,20 +90,14 @@ export default function StartWizard() {
     if (!offering.trim()) return setError("Tell us what you offer — one line is enough");
     setBusy(true);
     setError("");
-    try {
-      const r = await fetch(`/api/business/${bizId}/copy`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ offering, special, action }),
-      });
-      const d = await r.json();
-      if (!r.ok) throw new Error(d.error);
-      setCopy(d.content);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Could not write copy, try again");
-    } finally {
-      setBusy(false);
-    }
+    const r = await fetchJson<{ content: SiteCopy }>(`/api/business/${bizId}/copy`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ offering, special, action }),
+    });
+    setBusy(false);
+    if (!r.ok || !r.data) return setError(r.error);
+    setCopy(r.data.content);
   };
 
   const saveCopy = async () => {
@@ -123,9 +112,9 @@ export default function StartWizard() {
 
   const refreshProducts = useCallback(async () => {
     if (!bizId) return;
-    const r = await fetch(`/api/business/${bizId}/photos`);
-    const d = await r.json();
-    if (d.products) setProducts(d.products);
+    const r = await fetchJson<{ products: Product[] }>(`/api/business/${bizId}/photos`);
+    if (r.ok && r.data?.products) setProducts(r.data.products);
+    // transient poll failures are silent — the next tick retries
   }, [bizId]);
 
   useEffect(() => {
@@ -144,19 +133,24 @@ export default function StartWizard() {
     if (!files?.length) return;
     setBusy(true);
     setError("");
-    try {
-      const fd = new FormData();
-      Array.from(files).forEach((f) => fd.append("files", f));
-      const r = await fetch(`/api/business/${bizId}/photos`, { method: "POST", body: fd });
-      const d = await r.json();
-      if (!r.ok) throw new Error(d.error);
-      await refreshProducts();
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Upload failed");
-    } finally {
+    const fd = new FormData();
+    let skipped = 0;
+    for (const f of Array.from(files)) {
+      const small = await downscaleImage(f);
+      if (small) fd.append("files", small);
+      else skipped++;
+    }
+    if (!fd.getAll("files").length) {
       setBusy(false);
       if (fileRef.current) fileRef.current.value = "";
+      return setError("Couldn't read those photos — please upload JPG or PNG images.");
     }
+    const r = await fetchJson(`/api/business/${bizId}/photos`, { method: "POST", body: fd });
+    setBusy(false);
+    if (fileRef.current) fileRef.current.value = "";
+    if (!r.ok) return setError(r.error);
+    if (skipped) setError(`${skipped} photo(s) couldn't be read and were skipped (use JPG/PNG).`);
+    await refreshProducts();
   };
 
   const publish = async () => {

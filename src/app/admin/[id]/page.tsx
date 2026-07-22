@@ -2,6 +2,7 @@
 
 import { use, useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
+import { fetchJson, downscaleImage } from "@/lib/client";
 
 type Biz = {
   id: string; slug: string; name: string; category: string; city: string;
@@ -38,9 +39,13 @@ export default function Admin({ params }: { params: Promise<{ id: string }> }) {
   const [busy, setBusy] = useState(false);
 
   const refresh = useCallback(async () => {
-    const r = await fetch(`/api/business/${id}`);
-    if (!r.ok) return;
-    const d = await r.json();
+    const r = await fetchJson<{
+      business: Biz; content: Content; products: Product[]; reels: Reel[];
+      quota: { reel_packs_used: number; photos_used: number };
+      leads_count: number; media_provider: string;
+    }>(`/api/business/${id}`);
+    if (!r.ok || !r.data) return; // transient failure — next poll retries
+    const d = r.data;
     setBiz(d.business);
     setContent(d.content || {});
     setProducts(d.products || []);
@@ -66,9 +71,9 @@ export default function Admin({ params }: { params: Promise<{ id: string }> }) {
 
   useEffect(() => {
     if (tab === "Leads") {
-      fetch(`/api/business/${id}/leads`)
-        .then((r) => r.json())
-        .then((d) => setLeads(d.leads || []));
+      fetchJson<{ leads: Lead[] }>(`/api/business/${id}/leads`).then((r) => {
+        if (r.ok && r.data) setLeads(r.data.leads || []);
+      });
     }
   }, [tab, id]);
 
@@ -104,33 +109,33 @@ export default function Admin({ params }: { params: Promise<{ id: string }> }) {
   const uploadPhotos = async (files: FileList | null) => {
     if (!files?.length) return;
     setBusy(true);
-    try {
-      const fd = new FormData();
-      Array.from(files).forEach((f) => fd.append("files", f));
-      const r = await fetch(`/api/business/${id}/photos`, { method: "POST", body: fd });
-      const d = await r.json();
-      if (!r.ok) flash(d.error || "Upload failed");
-      await refresh();
-    } finally {
+    const fd = new FormData();
+    for (const f of Array.from(files)) {
+      const small = await downscaleImage(f);
+      if (small) fd.append("files", small);
+    }
+    if (!fd.getAll("files").length) {
       setBusy(false);
       if (fileRef.current) fileRef.current.value = "";
+      return flash("Couldn't read those photos — use JPG or PNG.");
     }
+    const r = await fetchJson(`/api/business/${id}/photos`, { method: "POST", body: fd });
+    setBusy(false);
+    if (fileRef.current) fileRef.current.value = "";
+    if (!r.ok) flash(r.error);
+    await refresh();
   };
 
   const makeReels = async (productId: string) => {
     setBusy(true);
-    try {
-      const r = await fetch(`/api/business/${id}/reels`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ product_id: productId }),
-      });
-      const d = await r.json();
-      flash(r.ok ? "Generating 2 reels — takes a few minutes" : d.error);
-      await refresh();
-    } finally {
-      setBusy(false);
-    }
+    const r = await fetchJson(`/api/business/${id}/reels`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ product_id: productId }),
+    });
+    setBusy(false);
+    flash(r.ok ? "Generating 2 reels — takes a few minutes" : r.error);
+    await refresh();
   };
 
   if (!biz) {

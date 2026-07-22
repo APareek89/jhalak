@@ -51,7 +51,11 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string
 }
 
 export async function GET(_req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
-  const { id } = await ctx.params;
-  const reels = await q(`select * from jhalak.reels where business_id=$1 order by created_at desc`, [id]);
-  return NextResponse.json({ reels });
+  try {
+    const { id } = await ctx.params;
+    const reels = await q(`select * from jhalak.reels where business_id=$1 order by created_at desc`, [id]);
+    return NextResponse.json({ reels });
+  } catch (e) {
+    return NextResponse.json({ error: e instanceof Error ? e.message : "failed" }, { status: 500 });
+  }
 }

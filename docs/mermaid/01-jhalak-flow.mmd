@@ -1,0 +1,21 @@
+%% granularity: master
+%% files: src/app/start/page.tsx, src/app/admin/[id]/page.tsx, src/app/s/[slug]/page.tsx, src/lib/jobs.ts, src/lib/mediaai.ts, src/lib/claude.ts, src/lib/media.ts, src/lib/db.ts
+flowchart TD
+    A[Owner: /start wizard] -->|POST /api/business| B[(Supabase Mumbai\nschema jhalak)]
+    A -->|3 answers| C{{AGENT: Claude sonnet-4-6\nsite copy JSON}}
+    C -->|site_content| B
+    A -->|photos multipart| D[FUNCTION: saveMedia\nbytea in Postgres]
+    D --> E[FUNCTION: processProductPhoto\nfire-and-forget, client polls]
+    E --> F{{AGENT: Claude vision base64\ntitle/desc/tags}}
+    E --> G{provider()?}
+    G -->|fal / pixelbin| H[FUNCTION: polishImage\n→ persistRemote → bytea]
+    G -->|off| I[keep original photo]
+    F --> B
+    H --> B
+    J[Visitor: /s/slug] -->|SSR force-dynamic| B
+    J -->|lead form POST /api/leads| B
+    K[Owner: /admin/id\nno auth - accepted risk] -->|CRUD + publish| B
+    K -->|reel pack, cap 2| L{provider()?}
+    L -->|off| M[503 friendly notice]
+    L -->|on| N[FUNCTION: generateReel 9:16\n→ bytea → video url]
+    B -->|GET /api/media/:id\nbytea + immutable cache| J

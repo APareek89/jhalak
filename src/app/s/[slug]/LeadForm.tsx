@@ -18,6 +18,7 @@ export default function LeadForm({ slug, accentBg }: { slug: string; accentBg: s
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ slug, name, phone, message }),
       });
+      // don't .json() — an HTML error page must not crash the form
       if (!r.ok) throw new Error();
       setState("done");
     } catch {
