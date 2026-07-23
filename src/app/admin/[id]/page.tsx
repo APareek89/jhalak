@@ -292,7 +292,7 @@ export default function Admin({ params }: { params: Promise<{ id: string }> }) {
       }
       actions={
         <span className="flex items-center gap-2">
-          <Link href="/start" className="btn-secondary !py-1.5 !text-xs hidden sm:inline-flex"><Plus size={13} /> Create Website</Link>
+          <Link href="/start" className="btn-secondary !py-1.5 !text-xs max-sm:!hidden"><Plus size={13} /> Create Website</Link>
           <Link href={`/studio/${id}`} className="btn-primary !py-1.5 !text-xs"><Wand2 size={13} /> Studio</Link>
           <a href={siteUrl} target="_blank" className="btn-secondary !py-1.5 !text-xs"><ExternalLink size={12} /> View site</a>
         </span>
