@@ -1,6 +1,6 @@
 import { q } from "./db";
 import { generateImage } from "./mediaai";
-import { reserveGeneration } from "./quota";
+import { reserveGeneration, releaseGeneration } from "./quota";
 import type { BusinessBasics } from "./claude";
 
 /**
@@ -57,7 +57,7 @@ export async function generateAndSaveHero(
 ): Promise<string | null> {
   if (!(await reserveGeneration(bizId, cap))) return null;
   const url = await generateImage(heroImagePrompt(biz, content, typeLabel), "hero");
-  if (!url) return null;
+  if (!url) { await releaseGeneration(bizId); return null; }
   await q(
     `insert into jhalak.site_content (business_id, content)
        values ($1, jsonb_build_object('hero_image_url', $2::text))
@@ -81,5 +81,7 @@ export async function generateProductImage(
   cap?: number
 ): Promise<string | null> {
   if (!(await reserveGeneration(bizId, cap))) return null;
-  return generateImage(productImagePrompt(item, biz), "square");
+  const url = await generateImage(productImagePrompt(item, biz), "square");
+  if (!url) await releaseGeneration(bizId);
+  return url;
 }

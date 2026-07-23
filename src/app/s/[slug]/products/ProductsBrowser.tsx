@@ -63,7 +63,7 @@ export default function ProductsBrowser({
               <div className="relative">
                 <ProductThumb src={p.image} title={p.title}
                   className="aspect-square w-full group-hover:scale-[1.02] transition" />
-                {p.discount_pct > 0 && (
+                {p.discount_pct > 0 && p.price_text && (
                   <span className="absolute top-3 left-3 rounded-full bg-rose-600 text-white text-xs font-bold px-2.5 py-1">
                     {p.discount_pct}% OFF
                   </span>

@@ -53,7 +53,9 @@ async function falRun(model: string, input: Record<string, unknown>): Promise<Re
     const st = await fetch(job.status_url, {
       headers: { Authorization: `Key ${process.env.FAL_KEY}` },
     });
-    const sd = (await st.json()) as { status: string };
+    if (!st.ok) continue; // transient gateway error — keep polling until the deadline
+    let sd: { status?: string };
+    try { sd = (await st.json()) as { status?: string }; } catch { continue; }
     if (sd.status === "COMPLETED") break;
     if (sd.status === "FAILED" || sd.status === "ERROR") throw new Error("fal job failed");
   }

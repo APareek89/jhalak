@@ -98,7 +98,11 @@ export default function ImportFlow({ onBack }: { onBack: () => void }) {
           }…`
         );
         const pending = prods.some((p) => p.status === "generating" || p.status === "processing");
-        if (hero && !pending) break;
+        // hero is generated BEFORE products, so once no product is pending the hero has
+        // already resolved (arrived or failed → gradient fallback). Don't wait forever
+        // for a hero that will never come (provider off / gen failure).
+        const done = prods.length ? !pending : hero || i >= 3;
+        if (done) break;
       }
       await new Promise((res) => setTimeout(res, 4000));
     }

@@ -28,6 +28,7 @@ export default function Studio({ params }: { params: Promise<{ id: string }> }) 
   const [mobileView, setMobileView] = useState<"chat" | "preview">("chat");
   const [selected, setSelected] = useState<{ section: string; sectionType: string } | null>(null);
   const [savedFlash, setSavedFlash] = useState("");
+  const [flashErr, setFlashErr] = useState(false);
   const chatEnd = useRef<HTMLDivElement>(null);
   const iframeRef = useRef<HTMLIFrameElement>(null);
 
@@ -52,6 +53,8 @@ export default function Studio({ params }: { params: Promise<{ id: string }> }) 
   // bridge from the ?edit=1 preview iframe: inline text edits + section selection
   useEffect(() => {
     const onMsg = async (e: MessageEvent) => {
+      // only trust messages from our own preview iframe (same origin + same window)
+      if (e.origin !== window.location.origin || e.source !== iframeRef.current?.contentWindow) return;
       const d = e.data;
       if (!d || !d.__jhalak) return;
       if (d.type === "select") {
@@ -63,7 +66,15 @@ export default function Studio({ params }: { params: Promise<{ id: string }> }) 
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ path: d.path, value: d.value }),
         });
-        if (r.ok) { setSavedFlash("Saved ✓"); setTimeout(() => setSavedFlash(""), 1600); }
+        if (r.ok) {
+          setFlashErr(false); setSavedFlash("Saved ✓");
+          setTimeout(() => setSavedFlash(""), 1600);
+        } else {
+          // don't let a failed save look saved — surface it and revert the preview node
+          setFlashErr(true); setSavedFlash(r.error || "Couldn't save — try again");
+          iframeRef.current?.contentWindow?.postMessage({ __jhalakParent: true, type: "revert", path: d.path }, window.location.origin);
+          setTimeout(() => { setSavedFlash(""); setFlashErr(false); }, 3000);
+        }
       }
     };
     window.addEventListener("message", onMsg);
@@ -72,7 +83,7 @@ export default function Studio({ params }: { params: Promise<{ id: string }> }) 
 
   const clearSelection = () => {
     setSelected(null);
-    iframeRef.current?.contentWindow?.postMessage({ __jhalakParent: true, type: "clear-selection" }, "*");
+    iframeRef.current?.contentWindow?.postMessage({ __jhalakParent: true, type: "clear-selection" }, window.location.origin);
   };
 
   const send = async (text?: string) => {
@@ -115,10 +126,10 @@ export default function Studio({ params }: { params: Promise<{ id: string }> }) 
 
   return (
     <div className="h-screen flex flex-col bg-slate-100">
-      <header className="bg-white border-b border-slate-200 px-5 py-3 flex items-center justify-between shrink-0">
-        <div className="flex items-center gap-3 min-w-0">
-          <Link href="/" className="font-display text-lg font-semibold shrink-0">Jhalak</Link>
-          <span className="text-stone-300">/</span>
+      <header className="bg-white border-b border-slate-200 px-3 sm:px-5 py-3 flex items-center justify-between gap-2 shrink-0">
+        <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+          <Link href="/" className="font-display text-lg font-semibold shrink-0 hidden sm:inline">Jhalak</Link>
+          <span className="text-stone-300 hidden sm:inline">/</span>
           <span className="font-medium truncate">{name || "Studio"}</span>
           <span className={`text-xs px-2 py-0.5 rounded-full shrink-0 ${
             status === "published" ? "bg-green-100 text-green-700" : "bg-amber-100 text-amber-700"
@@ -127,16 +138,16 @@ export default function Studio({ params }: { params: Promise<{ id: string }> }) 
           </span>
         </div>
         <div className="flex items-center gap-2 shrink-0">
-          <Link href={`/admin/${id}`} className="rounded-full border border-slate-300 px-4 py-2 text-sm hover:border-slate-500 transition">
+          <Link href={`/admin/${id}`} className="hidden sm:inline-block rounded-full border border-slate-300 px-4 py-2 text-sm hover:border-slate-500 transition">
             Dashboard
           </Link>
           {slug && (
-            <a href={`/s/${slug}`} target="_blank" className="rounded-full border border-slate-300 px-4 py-2 text-sm hover:border-slate-500 transition">
+            <a href={`/s/${slug}`} target="_blank" className="hidden sm:inline-block rounded-full border border-slate-300 px-4 py-2 text-sm hover:border-slate-500 transition">
               Open site ↗
             </a>
           )}
           <button onClick={publish} disabled={busy || status === "published"}
-            className="rounded-full bg-blue-600 text-white px-5 py-2 text-sm font-semibold hover:bg-blue-700 transition disabled:opacity-50">
+            className="rounded-full bg-blue-600 text-white px-4 sm:px-5 py-2 text-sm font-semibold hover:bg-blue-700 transition disabled:opacity-50 shrink-0">
             {status === "published" ? "✓ Live" : "🚀 Publish"}
           </button>
         </div>
@@ -211,7 +222,7 @@ export default function Studio({ params }: { params: Promise<{ id: string }> }) 
                     <button onClick={clearSelection} aria-label="Clear selection" className="text-blue-500 hover:text-blue-900 text-sm leading-none">×</button>
                   </span>
                 )}
-                {savedFlash && <span className="text-xs text-green-600 font-medium">{savedFlash}</span>}
+                {savedFlash && <span className={`text-xs font-medium ${flashErr ? "text-red-600" : "text-green-600"}`}>{savedFlash}</span>}
               </div>
             )}
             <div className="flex gap-2 items-center">

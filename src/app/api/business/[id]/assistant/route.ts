@@ -5,7 +5,7 @@ import { canManageBusiness } from "@/lib/auth";
 import { ACCENTS } from "@/lib/tenant";
 import { generateImage } from "@/lib/mediaai";
 import { heroImagePrompt, productImagePrompt } from "@/lib/imagery";
-import { reserveGeneration } from "@/lib/quota";
+import { reserveGeneration, releaseGeneration } from "@/lib/quota";
 import { normalizeSectionsForStore } from "@/lib/import";
 
 const MODEL = "claude-sonnet-4-6";
@@ -260,7 +260,7 @@ async function runTool(bizId: string, name: string, input: ToolInput): Promise<s
       );
       const content = cRows[0]?.content || {};
       const url = await generateImage(heroImagePrompt(b, content, content.business_type) + dir, "hero");
-      if (!url) return "image generation failed — please try again in a moment";
+      if (!url) { await releaseGeneration(bizId); return "image generation failed — please try again in a moment"; }
       await q(
         `insert into jhalak.site_content (business_id, content) values ($1, jsonb_build_object('hero_image_url', $2::text))
          on conflict (business_id) do update set content = jhalak.site_content.content || jsonb_build_object('hero_image_url', $2::text), updated_at=now()`,
@@ -272,10 +272,10 @@ async function runTool(bizId: string, name: string, input: ToolInput): Promise<s
       `select id, title, description, category from jhalak.products where business_id=$1 and lower(title)=lower($2) limit 1`,
       [bizId, target]
     );
-    if (!prod.length) return `no product named '${target}' — try its exact title`;
+    if (!prod.length) { await releaseGeneration(bizId); return `no product named '${target}' — try its exact title`; }
     const p = prod[0];
     const url = await generateImage(productImagePrompt({ title: p.title, description: p.description, category: p.category }, b) + dir, "square");
-    if (!url) return "image generation failed — please try again in a moment";
+    if (!url) { await releaseGeneration(bizId); return "image generation failed — please try again in a moment"; }
     await q(`update jhalak.products set processed_url=$1, status='ready' where id=$2`, [url, p.id]);
     return `regenerated the image for ${p.title} 🎨`;
   }

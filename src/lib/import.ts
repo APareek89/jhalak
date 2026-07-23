@@ -52,35 +52,36 @@ function normalizeSection(raw: any): Section | null {
   if (!SECTION_TYPES.includes(type)) return null;
   const items = Array.isArray(raw?.items) ? raw.items : [];
   const base = { id: type, enabled: true as const };
+  // fact() (not str()) on visitor-facing text drops placeholder literals like "<UNKNOWN>"
   if (type === "stats") {
     const list = items
-      .map((it: Record<string, unknown>) => ({ value: str(it.value, 20), label: str(it.label, 40) }))
+      .map((it: Record<string, unknown>) => ({ value: fact(it.value, 20), label: fact(it.label, 40) }))
       .filter((it: { value: string; label: string }) => it.value && it.label)
       .slice(0, 4);
     return list.length ? { ...base, type, items: list } : null;
   }
   if (type === "industries" || type === "certifications") {
     const list = items
-      .map((it: Record<string, unknown>) => ({ name: str(it.name || it.label, 60) }))
+      .map((it: Record<string, unknown>) => ({ name: fact(it.name || it.label, 60) }))
       .filter((it: { name: string }) => it.name)
       .slice(0, 8);
-    return list.length ? { ...base, type, title: str(raw.title, 80) || undefined, items: list } : null;
+    return list.length ? { ...base, type, title: fact(raw.title, 80) || undefined, items: list } : null;
   }
   if (type === "testimonials") {
     const list = items
       .map((it: Record<string, unknown>) => ({
-        quote: str(it.quote, 280),
-        author: str(it.author, 60),
-        role: str(it.role, 80) || undefined,
+        quote: fact(it.quote, 280),
+        author: fact(it.author, 60),
+        role: fact(it.role, 80) || undefined,
       }))
       .filter((it: { quote: string; author: string }) => it.quote && it.author)
       .slice(0, 6);
-    return list.length ? { ...base, type, title: str(raw.title, 80) || undefined, items: list } : null;
+    return list.length ? { ...base, type, title: fact(raw.title, 80) || undefined, items: list } : null;
   }
   if (type === "cta_banner") {
-    const heading = str(raw.heading, 120);
+    const heading = fact(raw.heading, 120);
     return heading
-      ? { ...base, type, heading, subtext: str(raw.subtext, 200) || undefined, button_label: str(raw.button_label, 40) || undefined }
+      ? { ...base, type, heading, subtext: fact(raw.subtext, 200) || undefined, button_label: fact(raw.button_label, 40) || undefined }
       : null;
   }
   return null;
@@ -107,15 +108,15 @@ function normalizeDraft(raw: any): SiteDraft {
   const language = raw?.language === "hinglish" ? "hinglish" : "english";
   const products: ProductDraft[] = (Array.isArray(raw?.products) ? raw.products : [])
     .map((p: Record<string, unknown>) => ({
-      title: str(p.title, 80),
-      description: str(p.description, 300),
-      category: str(p.category, 40),
-      price_text: str(p.price_text, 40),
+      title: fact(p.title, 80),
+      description: fact(p.description, 300),
+      category: fact(p.category, 40),
+      price_text: fact(p.price_text, 40),
     }))
     .filter((p: ProductDraft) => p.title)
     .slice(0, MAX_IMPORT_PRODUCTS);
   const services = (Array.isArray(raw?.services) ? raw.services : [])
-    .map((s: Record<string, unknown>) => ({ title: str(s.title, 60), desc: str(s.desc, 200) }))
+    .map((s: Record<string, unknown>) => ({ title: fact(s.title, 60), desc: fact(s.desc, 200) }))
     .filter((s: { title: string; desc: string }) => s.title)
     .slice(0, 3);
   const sections = (Array.isArray(raw?.sections) ? raw.sections : [])
@@ -138,10 +139,10 @@ function normalizeDraft(raw: any): SiteDraft {
     city: fact(raw?.city, 60),
     phone: fact(raw?.phone, 30).replace(/[^\d+ ]/g, ""),
     language,
-    headline: str(raw?.headline, 120),
-    tagline: str(raw?.tagline, 200),
-    about: str(raw?.about, 800),
-    cta_label: str(raw?.cta_label, 40) || "Get in touch",
+    headline: fact(raw?.headline, 120),
+    tagline: fact(raw?.tagline, 200),
+    about: fact(raw?.about, 800),
+    cta_label: fact(raw?.cta_label, 40) || "Get in touch",
     services,
     products,
     tabs,

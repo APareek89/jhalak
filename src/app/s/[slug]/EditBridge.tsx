@@ -14,8 +14,11 @@ import { useEffect } from "react";
 export default function EditBridge() {
   useEffect(() => {
     const post = (msg: Record<string, unknown>) => {
-      try { window.parent?.postMessage({ __jhalak: true, ...msg }, "*"); } catch { /* no parent */ }
+      // target the concrete Studio origin (same host) — never "*"
+      try { window.parent?.postMessage({ __jhalak: true, ...msg }, window.location.origin); } catch { /* no parent */ }
     };
+    // remember each field's pre-edit text so the Studio can ask us to revert on a save error
+    const originals = new Map<string, string>();
 
     const style = document.createElement("style");
     style.textContent = `
@@ -43,6 +46,8 @@ export default function EditBridge() {
       if (editing) return;
       editing = el;
       const original = (el.innerText || "").trim();
+      const path = el.getAttribute("data-edit");
+      if (path) originals.set(path, original);
       const multiline = el.getAttribute("data-edit") === "about";
       el.classList.add("jhalak-editing");
       el.setAttribute("contenteditable", "true");
@@ -89,9 +94,14 @@ export default function EditBridge() {
     };
 
     const onMsg = (e: MessageEvent) => {
-      if (e.data?.__jhalakParent && e.data.type === "clear-selection" && selected) {
+      if (e.origin !== window.location.origin || !e.data?.__jhalakParent) return;
+      if (e.data.type === "clear-selection" && selected) {
         selected.classList.remove("jhalak-selected");
         selected = null;
+      } else if (e.data.type === "revert" && typeof e.data.path === "string") {
+        // a save failed in the Studio — restore the field's pre-edit text
+        const el = document.querySelector<HTMLElement>(`[data-edit="${CSS.escape(e.data.path)}"]`);
+        if (el && originals.has(e.data.path)) el.innerText = originals.get(e.data.path)!;
       }
     };
 

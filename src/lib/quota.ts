@@ -26,6 +26,18 @@ export async function reserveGeneration(bizId: string, cap = GEN_CAP): Promise<b
   return rows.length > 0;
 }
 
+/**
+ * Release a previously-reserved slot when the generation ultimately failed (provider
+ * error / no output). Reserve-before-call keeps the budget a hard ceiling; this refund
+ * means a fal outage doesn't permanently burn the owner's whole image allowance.
+ */
+export async function releaseGeneration(bizId: string): Promise<void> {
+  await q(
+    `update jhalak.quotas set gens_used = gens_used - 1 where business_id=$1 and gens_used > 0`,
+    [bizId]
+  ).catch(() => {});
+}
+
 /** How many generations this business has already spent. */
 export async function gensUsed(bizId: string): Promise<number> {
   const rows = await q<{ gens_used: number }>(

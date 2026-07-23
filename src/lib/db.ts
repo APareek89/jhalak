@@ -154,6 +154,32 @@ export async function q<T = Record<string, unknown>>(
   }
 }
 
+export type TxQuery = <T = Record<string, unknown>>(text: string, params?: unknown[]) => Promise<T[]>;
+
+/**
+ * Run `fn` inside a single transaction (BEGIN/COMMIT, ROLLBACK on throw). Use for
+ * multi-write create flows so a mid-sequence failure leaves no orphan rows. `fn`
+ * receives a query bound to the transaction's client — do NOT use the shared `q()`
+ * inside it (that would run on a different, non-transactional connection).
+ */
+export async function withTx<T>(fn: (query: TxQuery) => Promise<T>): Promise<T> {
+  await ensureSchema();
+  const client = await getPool().connect();
+  try {
+    await client.query("BEGIN");
+    const query: TxQuery = async (text, params = []) =>
+      (await client.query(text, params as never[])).rows as never[];
+    const out = await fn(query);
+    await client.query("COMMIT");
+    return out;
+  } catch (e) {
+    await client.query("ROLLBACK").catch(() => {});
+    throw e;
+  } finally {
+    client.release();
+  }
+}
+
 export function slugify(s: string): string {
   return s
     .toLowerCase()
