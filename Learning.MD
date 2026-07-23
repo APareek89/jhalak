@@ -58,3 +58,11 @@
 - **Deepest why (knowledge-gap):** flux/schnell is a distilled model with weak negative-prompt handling; a plain "no text" is often ignored, especially when the title implies labels/packaging.
 - **Action:** strengthened the NO_TEXT constraint to be blunt and repetitive (no letters/words/numbers/labels/signage). Owners can also regenerate any image from Studio (F4 regenerate_image).
 - **Preventive:** for t2i product/hero images, always frame as an unbranded photograph; if text artifacts persist on a model, fall back to nano-banana (better text suppression) via FAL_T2I_MODEL.
+
+## 2026-07-23 — v6 FMEA batch: SSRF, OOM, and budget-leak in the new import flow (pre-deploy)
+- **Symptom:** an adversarial FMEA of the v6 diff confirmed 13 findings, incl. 2 P0s introduced by the URL-import feature.
+- **Why 1 (SSRF, deepest = design):** a NEW route (/api/import) let any self-serve user make the server fetch an arbitrary URL and reflected the body back — moving a fetch that was previously owner-gated (in the reference route) into an any-user route dropped the trust barrier, and no SSRF guard existed. → fetch of user-supplied URLs on cloud infra reaches the metadata IP / internal services.
+- **Why 2 (OOM, deepest = process):** the URL fetch used `await r.text()` with no byte cap while the SIBLING upload paths in the same feature already cap bytes (MAX_DOC_BYTES/MAX_FILE_BYTES) — the new ingest path wasn't held to the existing invariant.
+- **Why 3 (budget leak, code):** reserve-before-call incremented gens_used but never released on provider failure, so a fal outage could burn the whole allowance for zero images.
+- **Action:** DNS/IP allow-guard + streamed byte cap + per-redirect-hop revalidation in reference.ts; releaseGeneration() refund on failed gen; /apply wrapped in a transaction; gallery/inline-edit/discount-badge visitor-facing fixes.
+- **Preventive (class):** (a) ANY server-side fetch of a user-supplied URL MUST pass an IP/DNS private-range guard and must not reflect the raw body; (b) EVERY new ingest path (url/upload/paste) inherits the same byte cap as existing ones — grep the sibling paths for the invariant before shipping a new one; (c) reserve-before-spend always needs a release-on-failure. Run the FMEA on new external-fetch/ingest features BEFORE deploy, not after.
