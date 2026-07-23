@@ -5,6 +5,7 @@ import LeadForm from "./LeadForm";
 import TenantHeader from "./TenantHeader";
 import Sections from "./Sections";
 import ProductThumb from "./ProductThumb";
+import EditBridge from "./EditBridge";
 import { loadTenant, theme, waLink, enabledTabs, enabledSections, navItems, discounted } from "@/lib/tenant";
 
 export const dynamic = "force-dynamic";
@@ -21,8 +22,15 @@ export async function generateMetadata(
   };
 }
 
-export default async function Site({ params }: { params: Promise<{ slug: string }> }) {
+export default async function Site({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ slug: string }>;
+  searchParams: Promise<{ edit?: string }>;
+}) {
   const { slug } = await params;
+  const editMode = (await searchParams)?.edit === "1";
   const data = await loadTenant(slug);
   if (!data) notFound();
   const { biz, content, products } = data;
@@ -47,7 +55,8 @@ export default async function Site({ params }: { params: Promise<{ slug: string 
 
   return (
     <div className={`min-h-screen ${t.page}`}>
-      {biz.status !== "published" && (
+      {editMode && <EditBridge />}
+      {biz.status !== "published" && !editMode && (
         <div className="bg-amber-100 text-amber-900 text-center text-xs py-1.5">
           Draft preview — not published yet
         </div>
@@ -104,8 +113,8 @@ export default async function Site({ params }: { params: Promise<{ slug: string 
             <div className="grid sm:grid-cols-3 gap-6">
               {content.services.map((s, i) => (
                 <div key={i} className={`rounded-2xl p-6 ${t.card}`}>
-                  <h3 className="font-semibold mb-2">{s.title}</h3>
-                  <p className="text-sm opacity-70 leading-6">{s.desc}</p>
+                  <h3 data-edit={`service:${i}:title`} className="font-semibold mb-2">{s.title}</h3>
+                  <p data-edit={`service:${i}:desc`} className="text-sm opacity-70 leading-6">{s.desc}</p>
                 </div>
               ))}
             </div>

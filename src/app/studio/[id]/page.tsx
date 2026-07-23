@@ -26,7 +26,16 @@ export default function Studio({ params }: { params: Promise<{ id: string }> }) 
   const [version, setVersion] = useState(1);
   const [published, setPublished] = useState(false);
   const [mobileView, setMobileView] = useState<"chat" | "preview">("chat");
+  const [selected, setSelected] = useState<{ section: string; sectionType: string } | null>(null);
+  const [savedFlash, setSavedFlash] = useState("");
   const chatEnd = useRef<HTMLDivElement>(null);
+  const iframeRef = useRef<HTMLIFrameElement>(null);
+
+  const SECTION_LABELS: Record<string, string> = {
+    hero: "Hero", about: "About", services: "What we do", products: "Products",
+    stats: "Stats", industries: "Industries", testimonials: "Testimonials",
+    certifications: "Certifications", cta_banner: "CTA banner", cta: "CTA banner",
+  };
 
   const load = useCallback(async () => {
     const r = await fetchJson<{ business: { slug: string; status: string; name: string } }>(`/api/business/${id}`);
@@ -40,6 +49,32 @@ export default function Studio({ params }: { params: Promise<{ id: string }> }) 
   useEffect(() => { load(); }, [load]);
   useEffect(() => { chatEnd.current?.scrollIntoView({ behavior: "smooth" }); }, [messages, busy]);
 
+  // bridge from the ?edit=1 preview iframe: inline text edits + section selection
+  useEffect(() => {
+    const onMsg = async (e: MessageEvent) => {
+      const d = e.data;
+      if (!d || !d.__jhalak) return;
+      if (d.type === "select") {
+        setSelected({ section: String(d.section || ""), sectionType: String(d.sectionType || "") });
+        setMobileView("chat");
+      } else if (d.type === "edit" && typeof d.path === "string") {
+        const r = await fetchJson(`/api/business/${id}/field`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ path: d.path, value: d.value }),
+        });
+        if (r.ok) { setSavedFlash("Saved ✓"); setTimeout(() => setSavedFlash(""), 1600); }
+      }
+    };
+    window.addEventListener("message", onMsg);
+    return () => window.removeEventListener("message", onMsg);
+  }, [id]);
+
+  const clearSelection = () => {
+    setSelected(null);
+    iframeRef.current?.contentWindow?.postMessage({ __jhalakParent: true, type: "clear-selection" }, "*");
+  };
+
   const send = async (text?: string) => {
     const content = (text ?? input).trim();
     if (!content || busy) return;
@@ -50,7 +85,7 @@ export default function Studio({ params }: { params: Promise<{ id: string }> }) 
     const r = await fetchJson<{ reply: string; applied: string[] }>(`/api/business/${id}/assistant`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ messages: next.slice(-12) }),
+      body: JSON.stringify({ messages: next.slice(-12), scope: selected || undefined }),
     });
     setBusy(false);
     if (!r.ok || !r.data) {
@@ -124,10 +159,13 @@ export default function Studio({ params }: { params: Promise<{ id: string }> }) 
             {!messages.length && (
               <div className="space-y-4">
                 <p className="text-sm text-slate-600 leading-6">
-                  👋 This is your <b>website editor</b>. Tell me what to change — copy,
-                  colors, template, tabs, product prices — and you&apos;ll see it update
-                  in the preview instantly.
+                  👋 This is your <b>website editor</b>. Two ways to edit:
                 </p>
+                <ul className="text-sm text-slate-600 leading-6 list-disc pl-5 space-y-1">
+                  <li><b>Click any text</b> in the preview to retype it.</li>
+                  <li><b>Click a section</b> (like the hero), then tell me what to change — e.g. “make the image more industrial, blue tones”.</li>
+                  <li>Or just type a change below.</li>
+                </ul>
                 <div className="space-y-2">
                   {SUGGESTIONS.map((s) => (
                     <button key={s} onClick={() => send(s)}
@@ -165,13 +203,24 @@ export default function Studio({ params }: { params: Promise<{ id: string }> }) 
             <div ref={chatEnd} />
           </div>
           <div className="p-4 border-t border-slate-200">
+            {(selected || savedFlash) && (
+              <div className="mb-2 flex items-center gap-2 flex-wrap">
+                {selected && (
+                  <span className="inline-flex items-center gap-1.5 text-xs font-medium bg-blue-100 text-blue-800 rounded-full pl-3 pr-2 py-1">
+                    ✏️ Editing: {SECTION_LABELS[selected.section] || selected.section}
+                    <button onClick={clearSelection} aria-label="Clear selection" className="text-blue-500 hover:text-blue-900 text-sm leading-none">×</button>
+                  </span>
+                )}
+                {savedFlash && <span className="text-xs text-green-600 font-medium">{savedFlash}</span>}
+              </div>
+            )}
             <div className="flex gap-2 items-center">
               <MicButton onText={(t) => setInput((v) => (v ? v + " " : "") + t)} />
               <input
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
                 onKeyDown={(e) => e.key === "Enter" && send()}
-                placeholder="e.g. Make the headline about bridal wear…"
+                placeholder={selected ? `Editing ${SECTION_LABELS[selected.section] || selected.section} — e.g. "make this shorter"` : "e.g. Make the headline about bridal wear…"}
                 disabled={busy}
                 className="flex-1 border border-slate-300 rounded-full px-4 py-2.5 text-sm outline-none focus:border-blue-600 disabled:opacity-50"
               />
@@ -187,7 +236,7 @@ export default function Studio({ params }: { params: Promise<{ id: string }> }) 
         <div className={`flex-1 flex-col bg-slate-200 p-2 sm:p-4 ${mobileView === "preview" ? "flex" : "hidden sm:flex"}`}>
           <div className="flex-1 rounded-2xl overflow-hidden bg-white shadow-xl">
             {slug ? (
-              <iframe key={version} src={`/s/${slug}`} className="w-full h-full" title="Website preview" />
+              <iframe ref={iframeRef} key={version} src={`/s/${slug}?edit=1`} className="w-full h-full" title="Website preview" />
             ) : (
               <div className="w-full h-full flex items-center justify-center text-slate-400">Loading preview…</div>
             )}
