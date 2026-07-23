@@ -3,7 +3,8 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import LeadForm from "./LeadForm";
 import TenantHeader from "./TenantHeader";
-import { loadTenant, theme, waLink, enabledTabs, navItems, discounted } from "@/lib/tenant";
+import Sections from "./Sections";
+import { loadTenant, theme, waLink, enabledTabs, enabledSections, navItems, discounted } from "@/lib/tenant";
 
 export const dynamic = "force-dynamic";
 
@@ -31,9 +32,14 @@ export default async function Site({ params }: { params: Promise<{ slug: string 
     gallery: on.has("gallery"), contact: on.has("contact"),
   };
   const wa = waLink(biz);
-  const heroImg = products[0]?.processed_url || products[0]?.original_url || "";
+  // Prefer a dedicated (generated/uploaded) hero; fall back to the first product photo.
+  const heroImg = content.hero_image_url || products[0]?.processed_url || products[0]?.original_url || "";
   const isService = biz.category !== "boutique";
   const featured = products.slice(0, 3);
+  const sections = enabledSections(content);
+  const statsSections = sections.filter((s) => s.type === "stats");
+  const trustSections = sections.filter((s) => s.type !== "stats");
+  const contactHref = on.has("contact") ? "#contact" : wa || "#";
 
   return (
     <div className={`min-h-screen ${t.page}`}>
@@ -49,18 +55,18 @@ export default async function Site({ params }: { params: Promise<{ slug: string 
         items={navItems(slug, content, products.length)}
       />
 
-      <section className={`${t.hero}`}>
+      <section data-section="hero" className={`${t.hero}`}>
         <div className="max-w-5xl mx-auto px-6 py-16 sm:py-24 grid sm:grid-cols-2 gap-10 items-center">
           <div>
             <p className={`text-xs uppercase tracking-[0.25em] mb-4 ${t.accentText}`}>
               {biz.city ? `${biz.city} ·` : ""} {biz.category}
             </p>
-            <h1 className={`${t.display} text-4xl sm:text-5xl leading-tight`}>
+            <h1 data-edit="headline" className={`${t.display} text-4xl sm:text-5xl leading-tight`}>
               {content.headline || biz.name}
             </h1>
-            {content.tagline && <p className="mt-4 text-lg opacity-80">{content.tagline}</p>}
+            {content.tagline && <p data-edit="tagline" className="mt-4 text-lg opacity-80">{content.tagline}</p>}
             <div className="mt-8 flex gap-3">
-              <a href={tabs.contact ? "#contact" : wa || "#"} className={`rounded-full ${t.accentBg} text-white px-7 py-3.5 font-semibold transition`}>
+              <a href={contactHref} data-edit="cta_label" className={`rounded-full ${t.accentBg} text-white px-7 py-3.5 font-semibold transition`}>
                 {content.cta_label || "Get in touch"}
               </a>
               {biz.phone && (
@@ -72,20 +78,23 @@ export default async function Site({ params }: { params: Promise<{ slug: string 
           </div>
           {heroImg && (
             // eslint-disable-next-line @next/next/no-img-element
-            <img src={heroImg} alt={biz.name} className="rounded-3xl aspect-square object-cover w-full shadow-2xl" />
+            <img src={heroImg} data-edit="hero_image" alt={biz.name} className="rounded-3xl aspect-square object-cover w-full shadow-2xl" />
           )}
         </div>
       </section>
 
+      {/* stats strip sits right under the hero */}
+      <Sections sections={statsSections} t={t} wa={wa} contactHref={contactHref} />
+
       {tabs.about && content.about && (
-        <section className="max-w-5xl mx-auto px-6 py-16">
+        <section data-section="about" className="max-w-5xl mx-auto px-6 py-16">
           <h2 className={`${t.display} text-2xl mb-4`}>About us</h2>
-          <p className="max-w-2xl text-lg leading-8 opacity-80">{content.about}</p>
+          <p data-edit="about" className="max-w-2xl text-lg leading-8 opacity-80">{content.about}</p>
         </section>
       )}
 
       {!!content.services?.length && (
-        <section className={t.sectionAlt}>
+        <section data-section="services" className={t.sectionAlt}>
           <div className="max-w-5xl mx-auto px-6 py-16">
             <h2 className={`${t.display} text-2xl mb-8`}>What we do</h2>
             <div className="grid sm:grid-cols-3 gap-6">
@@ -101,7 +110,7 @@ export default async function Site({ params }: { params: Promise<{ slug: string 
       )}
 
       {tabs.products && !!featured.length && (
-        <section className="max-w-5xl mx-auto px-6 py-16">
+        <section data-section="products" className="max-w-5xl mx-auto px-6 py-16">
           <div className="flex items-baseline justify-between mb-8">
             <h2 className={`${t.display} text-2xl`}>{isService ? "Our work" : "Featured"}</h2>
             <Link href={`/s/${slug}/products`} className={`text-sm font-semibold ${t.accentText}`}>
@@ -144,6 +153,9 @@ export default async function Site({ params }: { params: Promise<{ slug: string 
           </div>
         </section>
       )}
+
+      {/* trust-building blocks: industries, testimonials, certifications, CTA banner */}
+      <Sections sections={trustSections} t={t} wa={wa} contactHref={contactHref} />
 
       {tabs.contact && (
         <section id="contact" className={t.sectionAlt}>

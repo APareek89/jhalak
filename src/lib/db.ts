@@ -111,6 +111,8 @@ create table if not exists jhalak.users (
 );
 alter table jhalak.businesses add column if not exists owner_id uuid references jhalak.users(id);
 alter table jhalak.reels add column if not exists kind text not null default 'video';
+-- v6: AI image-generation budget (hero/section/product t2i). Capped per business.
+alter table jhalak.quotas add column if not exists gens_used int not null default 0;
 `;
 
 export function ensureSchema(): Promise<void> {

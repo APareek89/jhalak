@@ -31,6 +31,9 @@ export function lookProPrompt(category: string): string {
 
 const FAL_IMAGE_MODEL = process.env.FAL_IMAGE_MODEL || "fal-ai/nano-banana/edit";
 const FAL_VIDEO_MODEL = process.env.FAL_VIDEO_MODEL || "fal-ai/ltx-video-13b-distilled/image-to-video";
+// Text-to-image (no source photo). flux/schnell is fast (~4s) & cheap — right for the
+// <3-min import target and the 512MB memory budget. Override via FAL_T2I_MODEL.
+const FAL_T2I_MODEL = process.env.FAL_T2I_MODEL || "fal-ai/flux/schnell";
 
 async function falRun(model: string, input: Record<string, unknown>): Promise<Record<string, unknown>> {
   const submit = await fetch(`https://queue.fal.run/${model}`, {
@@ -168,6 +171,57 @@ export async function generateReel(
     return persistRemote(out, "video/mp4");
   }
   throw new Error("no video provider connected");
+}
+
+// fal flux/schnell image_size presets, keyed by the shape a caller wants.
+export type ImageShape = "hero" | "wide" | "square" | "portrait";
+const SHAPE_TO_SIZE: Record<ImageShape, string> = {
+  hero: "landscape_16_9",
+  wide: "landscape_16_9",
+  square: "square_hd",
+  portrait: "portrait_4_3",
+};
+
+/**
+ * Text-to-image generation from a prompt alone (no source photo) — used to give
+ * owners with no photos a real hero, section and product imagery. Returns a
+ * persisted /api/media URL, or null on failure (caller falls back to a gradient).
+ * NOTE: callers must sequence these (no Promise.all) — each fal result is buffered
+ * into memory before persisting, and the instance has a 512MB budget.
+ */
+export async function generateImage(
+  prompt: string,
+  shape: ImageShape = "square"
+): Promise<string | null> {
+  const p = provider();
+  try {
+    if (p === "fal") {
+      const out = await falRun(FAL_T2I_MODEL, {
+        prompt,
+        image_size: SHAPE_TO_SIZE[shape],
+        num_images: 1,
+        enable_safety_checker: true,
+      });
+      return await persistRemote(firstUrl(out), "image/jpeg");
+    }
+    if (p === "pixelbin") {
+      const out = await pxPredict(process.env.PIXELBIN_T2I_MODEL || "nanoBanana2_generate", {
+        prompt,
+        aspect_ratio: shape === "hero" || shape === "wide" ? "16:9" : shape === "portrait" ? "3:4" : "1:1",
+        output_resolution: "1K",
+      });
+      return await persistRemote(out, "image/jpeg");
+    }
+    return null;
+  } catch (e) {
+    const cause = (e as { cause?: { message?: string; code?: string } })?.cause;
+    console.error(
+      "[mediaai] generateImage failed:",
+      e instanceof Error ? e.message : e,
+      cause ? `| cause: ${cause.message || cause.code}` : ""
+    );
+    return null;
+  }
 }
 
 /** Generate a 9:16 image post from a product image + prompt. Returns /api/media URL. */

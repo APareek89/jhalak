@@ -14,6 +14,42 @@ export type TabConfig = {
   text: boolean;        // true → rendered as a text page at /s/[slug]/t/[key]
 };
 
+// ---------- Rich section blocks (v6) ----------
+// Optional, ordered, toggleable blocks stored in content.sections[]. The import
+// flow auto-picks which fit the business; owners toggle/edit them in Studio.
+export type SectionBase = { id: string; enabled: boolean };
+export type StatsSection = SectionBase & {
+  type: "stats";
+  items: { value: string; label: string }[];       // e.g. { value:"20+", label:"Years" }
+};
+export type IndustriesSection = SectionBase & {
+  type: "industries";
+  title?: string;
+  items: { name: string; image_url?: string }[];   // industries / clients served
+};
+export type TestimonialsSection = SectionBase & {
+  type: "testimonials";
+  title?: string;
+  items: { quote: string; author: string; role?: string }[];
+};
+export type CertificationsSection = SectionBase & {
+  type: "certifications";
+  title?: string;
+  items: { name: string; image_url?: string }[];
+};
+export type CtaBannerSection = SectionBase & {
+  type: "cta_banner";
+  heading: string;
+  subtext?: string;
+  button_label?: string;
+};
+export type Section =
+  | StatsSection | IndustriesSection | TestimonialsSection
+  | CertificationsSection | CtaBannerSection;
+
+export const SECTION_TYPES = ["stats", "industries", "testimonials", "certifications", "cta_banner"] as const;
+export type SectionType = (typeof SECTION_TYPES)[number];
+
 export type Content = {
   headline?: string; tagline?: string; about?: string;
   services?: { title: string; desc: string }[]; cta_label?: string;
@@ -22,7 +58,20 @@ export type Content = {
   pages?: Record<string, string>;                // text content for text tabs
   accent?: string; font?: string;
   reference_text?: string; reference_source?: string;
+  hero_image_url?: string;                        // generated/uploaded hero (v6)
+  sections?: Section[];                           // rich ordered blocks (v6)
 };
+
+/** True when a section has something worth rendering (avoids empty blocks). */
+export function sectionHasContent(s: Section): boolean {
+  if (s.type === "cta_banner") return !!s.heading?.trim();
+  return Array.isArray(s.items) && s.items.length > 0;
+}
+
+/** Enabled, non-empty section blocks in stored order — the tenant render list. */
+export function enabledSections(content: Content): Section[] {
+  return (content.sections || []).filter((s) => s && s.enabled && sectionHasContent(s));
+}
 
 export type Product = {
   id: string; title: string; description: string; price_text: string; category: string;
