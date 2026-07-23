@@ -71,9 +71,11 @@ export default function AppShell({
               <ChevronDown size={13} className={`text-slate-500 transition ${portOpen ? "rotate-180" : ""}`} />
             </button>
             {portOpen && (
+              <>
+              <div className="fixed inset-0 z-20" onClick={() => setPortOpen(false)} />
               <div className="absolute z-30 left-0 right-0 mt-1 bg-slate-900 border border-slate-700 rounded-lg overflow-hidden shadow-xl">
                 {portfolio.sites.map((b) => (
-                  <Link key={b.id} href={`/admin/${b.id}`}
+                  <Link key={b.id} href={`/admin/${b.id}`} onClick={() => setPortOpen(false)}
                     className={`flex items-center justify-between px-3 py-2 text-xs hover:bg-slate-800 transition ${
                       b.id === portfolio.currentId ? "text-white font-semibold" : "text-slate-300"
                     }`}>
@@ -81,11 +83,12 @@ export default function AppShell({
                     <span className={`ml-2 w-1.5 h-1.5 rounded-full shrink-0 ${b.status === "published" ? "bg-emerald-400" : "bg-amber-400"}`} />
                   </Link>
                 ))}
-                <Link href="/start"
+                <Link href="/start" onClick={() => setPortOpen(false)}
                   className="flex items-center gap-1.5 px-3 py-2 text-xs text-blue-400 font-semibold border-t border-slate-800 hover:bg-slate-800 transition">
                   <Plus size={12} /> New website
                 </Link>
               </div>
+              </>
             )}
           </div>
         )}
