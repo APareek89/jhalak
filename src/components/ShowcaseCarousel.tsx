@@ -15,11 +15,21 @@ const SAMPLES: Sample[] = [
 /** Live mini preview of a real published Jhalak site (scaled iframe).
  *  `live=false` renders a light placeholder — the duplicated loop copy must not
  *  double the server load (8 SSR page loads at once OOM'd the 512MB instance). */
-function SiteMini({ slug, live }: { slug: string; live: boolean }) {
+const PLACEHOLDER_GRADIENTS: Record<string, string> = {
+  emerald: "from-emerald-100 to-emerald-300 text-emerald-900",
+  blue: "from-blue-100 to-blue-300 text-blue-900",
+  stone: "from-stone-100 to-stone-300 text-stone-800",
+  violet: "from-violet-100 to-violet-300 text-violet-900",
+};
+
+function SiteMini({ slug, name, accent, live }: { slug: string; name: string; accent: string; live: boolean }) {
   if (!live) {
+    const g = PLACEHOLDER_GRADIENTS[accent] || PLACEHOLDER_GRADIENTS.blue;
     return (
-      <div className="w-full h-44 rounded-lg border border-slate-200 bg-gradient-to-br from-slate-100 to-slate-200 flex items-center justify-center">
-        <span className="text-[10px] text-slate-400 font-medium">/s/{slug}</span>
+      <div className={`w-full h-44 rounded-lg border border-slate-200 bg-gradient-to-br ${g} flex flex-col items-center justify-center gap-1`}>
+        <span className="text-lg font-bold opacity-80">{name.slice(0, 1)}</span>
+        <span className="text-[11px] font-semibold opacity-70">{name}</span>
+        <span className="text-[9px] opacity-50">tap ↗ to open the full site</span>
       </div>
     );
   }
@@ -28,7 +38,6 @@ function SiteMini({ slug, live }: { slug: string; live: boolean }) {
       <iframe
         src={`/s/${slug}`}
         title={slug}
-        loading="lazy"
         tabIndex={-1}
         className="absolute top-0 left-0 origin-top-left pointer-events-none"
         style={{ width: "1100px", height: "760px", transform: "scale(0.253)" }}
@@ -60,7 +69,7 @@ export default function ShowcaseCarousel({
             const isOn = active === key;
             return (
               <div key={s.slug + i} className={`rounded-xl p-2 transition ${isOn ? "ring-2 ring-blue-600 bg-blue-50/50" : "bg-white"}`}>
-                <SiteMini slug={s.slug} live={i < SAMPLES.length} />
+                <SiteMini slug={s.slug} name={s.name} accent={s.accent} live={i < SAMPLES.length} />
                 <div className="flex items-center justify-between mt-2 px-0.5 gap-2">
                   <div className="min-w-0">
                     <p className="text-[11.5px] font-semibold leading-tight truncate">{s.name}</p>
