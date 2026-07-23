@@ -32,6 +32,11 @@ last-synced: 5fae1ff
 - 2026-07-22 — Provider abstraction fal→pixelbin→off for AI media; ships OFF — agent.
 - 2026-07-22 — power-coding installed; git checkpoints = auto ⚠️ unconfirmed; FMEA = pre-commit + smart-suggest ⚠️ unconfirmed.
 
+## FAL KEY STATUS (2026-07-23 night)
+- FAL_KEY in .env.local AND Render is FRESH and FULL-ACCESS — verified 200 on
+  nano-banana/edit, nano-banana (t2i), flux/schnell, ltx i2v. The v6 prompt's
+  "key is dead, ask me" step is RESOLVED — just re-verify with one probe and build.
+
 ## Environment
 - Node 22 via nvm: `export PATH="$HOME/.nvm/versions/node/v22.22.0/bin:$PATH"`
 - Local dev: preview server "jhalak-dev" on :3444 (global launch.json) · `.env.local` (gitignored)
