@@ -2,6 +2,8 @@ import { q } from "./db";
 import { polishImage, generateReel, generateImagePost } from "./mediaai";
 import { generateProductCopy, reelPrompts, refineReelPrompt, type BusinessBasics } from "./claude";
 import { getMedia, absoluteMediaUrl } from "./media";
+import { generateAndSaveHero, generateProductImage } from "./imagery";
+import { IMPORT_GEN_BUDGET } from "./quota";
 
 /**
  * In-process async workers. Render runs a persistent Node server, so fire-and-forget
@@ -42,6 +44,40 @@ export function processProductPhoto(
         e instanceof Error ? e.message : String(e),
         productId,
       ]).catch(() => {});
+    }
+  })();
+}
+
+/**
+ * Import path: generate a whole site's imagery — hero first, then one image per
+ * product — STRICTLY SEQUENTIALLY (never Promise.all). Each fal result is buffered
+ * before persisting; on the 512MB instance a parallel burst OOMs (see Learning.MD
+ * 2026-07-23). Budget is enforced per-generation inside imagery.ts (quota.ts), so
+ * this loop naturally stops spending once the cap is hit — remaining products keep
+ * their branded placeholder tile. Fire-and-forget; products poll to 'ready'.
+ */
+export function generateSiteImagery(
+  bizId: string,
+  biz: BusinessBasics,
+  typeLabel: string,
+  heroContent: { headline?: string; tagline?: string; about?: string },
+  products: { id: string; title: string; description: string; category: string }[]
+): void {
+  (async () => {
+    try {
+      await generateAndSaveHero(bizId, { name: biz.name, category: biz.category, city: biz.city }, heroContent, typeLabel, IMPORT_GEN_BUDGET);
+    } catch (e) {
+      console.error("[imagery] hero:", e instanceof Error ? e.message : e);
+    }
+    for (const p of products) {
+      let url: string | null = null;
+      try {
+        url = await generateProductImage(bizId, p, biz, IMPORT_GEN_BUDGET);
+      } catch (e) {
+        console.error("[imagery] product:", e instanceof Error ? e.message : e);
+      }
+      // mark ready either way (empty url → placeholder tile, never a broken image)
+      await q(`update jhalak.products set processed_url=$1, status='ready' where id=$2`, [url || "", p.id]).catch(() => {});
     }
   })();
 }

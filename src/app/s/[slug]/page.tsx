@@ -4,6 +4,7 @@ import Link from "next/link";
 import LeadForm from "./LeadForm";
 import TenantHeader from "./TenantHeader";
 import Sections from "./Sections";
+import ProductThumb from "./ProductThumb";
 import { loadTenant, theme, waLink, enabledTabs, enabledSections, navItems, discounted } from "@/lib/tenant";
 
 export const dynamic = "force-dynamic";
@@ -40,6 +41,9 @@ export default async function Site({ params }: { params: Promise<{ slug: string 
   const statsSections = sections.filter((s) => s.type === "stats");
   const trustSections = sections.filter((s) => s.type !== "stats");
   const contactHref = on.has("contact") ? "#contact" : wa || "#";
+  // eyebrow: city · (real category, or the business_type for generic "other")
+  const kind = biz.category && biz.category !== "other" ? biz.category : content.business_type || "";
+  const eyebrow = [biz.city, kind].filter(Boolean).join(" · ");
 
   return (
     <div className={`min-h-screen ${t.page}`}>
@@ -58,9 +62,9 @@ export default async function Site({ params }: { params: Promise<{ slug: string 
       <section data-section="hero" className={`${t.hero}`}>
         <div className="max-w-5xl mx-auto px-6 py-16 sm:py-24 grid sm:grid-cols-2 gap-10 items-center">
           <div>
-            <p className={`text-xs uppercase tracking-[0.25em] mb-4 ${t.accentText}`}>
-              {biz.city ? `${biz.city} ·` : ""} {biz.category}
-            </p>
+            {eyebrow && (
+              <p className={`text-xs uppercase tracking-[0.25em] mb-4 ${t.accentText}`}>{eyebrow}</p>
+            )}
             <h1 data-edit="headline" className={`${t.display} text-4xl sm:text-5xl leading-tight`}>
               {content.headline || biz.name}
             </h1>
@@ -123,9 +127,8 @@ export default async function Site({ params }: { params: Promise<{ slug: string 
               return (
                 <Link key={p.id} href={`/s/${slug}/products`} className={`rounded-2xl overflow-hidden ${t.card} group`}>
                   <div className="relative">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={p.processed_url || p.original_url} alt={p.title}
-                      className="aspect-square object-cover w-full group-hover:scale-[1.02] transition" />
+                    <ProductThumb src={p.processed_url || p.original_url} title={p.title}
+                      className="aspect-square w-full group-hover:scale-[1.02] transition" />
                     {p.discount_pct > 0 && (
                       <span className="absolute top-3 left-3 rounded-full bg-rose-600 text-white text-xs font-bold px-2.5 py-1">
                         {p.discount_pct}% OFF

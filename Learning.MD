@@ -44,3 +44,17 @@
 - **Why-chain:** carousel duplicated its list for the scroll loop → 8 live iframes on /start → 8 simultaneous SSR tenant-page loads + ~30 bytea media queries → memory spike on the 512MB starter instance → restart → restarted instance failed port scan.
 - **Action:** live iframes only in the first carousel copy; loop copy renders placeholders. Recovered on redeploy.
 - **Preventive (class):** any N× duplication of components that trigger server work must budget the server cost, not just the DOM cost; before real launch either move media to CDN/object storage or bump the plan to 2GB (both already in Pending).
+
+## 2026-07-23 — new DB column (gens_used) missing at runtime despite being in bootstrap SQL
+- **Symptom:** import imagery silently produced no images; `reserveGeneration` threw "column gens_used does not exist" even though the `alter table … add column if not exists gens_used` was in db.ts's BOOTSTRAP_SQL.
+- **Why 1:** `ensureSchema()` memoizes its promise on `global._jhalakSchemaReady` and runs BOOTSTRAP_SQL exactly once per process.
+- **Why 2:** the long-running dev server (pid from a PRIOR session, still bound to :3444) had cached a RESOLVED ensureSchema from before gens_used was added; my new `next dev` hit EADDRINUSE and I unknowingly tested against the stale server.
+- **Why 3 (deepest, type = process):** schema evolution assumed "edit BOOTSTRAP_SQL → new column appears", but a memoized bootstrap only re-runs on a fresh process. Prod is safe (deploy = restart), local dev is not.
+- **Action:** killed the stale server, restarted → ensureSchema re-ran → column created. Verified via information_schema.
+- **Preventive (class):** after adding any `alter table … add column`, RESTART the dev server (don't trust HMR) and verify the column via information_schema before testing the feature. When a local test behaves as if code changes didn't apply, check for a stale server on the port (lsof -iTCP:PORT) FIRST.
+
+## 2026-07-23 — flux/schnell bakes garbled text into product images
+- **Symptom:** a generated "Spare Parts & Consumables" catalogue image rendered gibberish text ("Sparle Parts & Consumhitts") baked into the picture.
+- **Deepest why (knowledge-gap):** flux/schnell is a distilled model with weak negative-prompt handling; a plain "no text" is often ignored, especially when the title implies labels/packaging.
+- **Action:** strengthened the NO_TEXT constraint to be blunt and repetitive (no letters/words/numbers/labels/signage). Owners can also regenerate any image from Studio (F4 regenerate_image).
+- **Preventive:** for t2i product/hero images, always frame as an unbranded photograph; if text artifacts persist on a model, fall back to nano-banana (better text suppression) via FAL_T2I_MODEL.

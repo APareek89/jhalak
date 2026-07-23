@@ -10,15 +10,20 @@ import type { BusinessBasics } from "./claude";
  * fal result is buffered in memory before persisting and the instance has 512MB.
  */
 
-const NO_TEXT = "Photorealistic, premium commercial photography, natural lighting, sharp focus. No text, no words, no logos, no watermarks, no people's faces.";
+// flux/schnell readily bakes garbled text into images unless pushed hard — keep this
+// blunt and repetitive (it's a distilled model with weak negative-prompt handling).
+const NO_TEXT = "Unbranded and plain: absolutely NO text, no letters, no words, no numbers, no labels, no signage, no logos and no watermarks anywhere in the frame. Photorealistic, premium commercial photography, natural lighting, sharp focus, no people's faces.";
 
-/** Wide hero image grounded in the business + its generated copy. */
+/** Wide hero image grounded in the business + its generated copy. `typeLabel` is a
+ *  readable descriptor (e.g. "PET conveyor manufacturer") — falls back to category. */
 export function heroImagePrompt(
   biz: { name: string; category: string; city: string },
-  content: { headline?: string; tagline?: string; about?: string }
+  content: { headline?: string; tagline?: string; about?: string },
+  typeLabel?: string
 ): string {
-  const subject = content.about || content.tagline || content.headline || `a ${biz.category}`;
-  return `Wide 16:9 hero photograph for the website of ${biz.name}, a ${biz.category}${
+  const kind = (typeLabel || biz.category || "business").trim();
+  const subject = content.about || content.tagline || content.headline || kind;
+  return `Wide 16:9 hero photograph for the website of ${biz.name}, ${/^[aeiou]/i.test(kind) ? "an" : "a"} ${kind}${
     biz.city ? ` based in ${biz.city}, India` : " in India"
   }. Scene should evoke: ${subject}. Editorial, aspirational, uncluttered composition with room for a headline. ${NO_TEXT}`;
 }
@@ -46,10 +51,12 @@ export function productImagePrompt(
 export async function generateAndSaveHero(
   bizId: string,
   biz: { name: string; category: string; city: string },
-  content: { headline?: string; tagline?: string; about?: string }
+  content: { headline?: string; tagline?: string; about?: string },
+  typeLabel?: string,
+  cap?: number
 ): Promise<string | null> {
-  if (!(await reserveGeneration(bizId))) return null;
-  const url = await generateImage(heroImagePrompt(biz, content), "hero");
+  if (!(await reserveGeneration(bizId, cap))) return null;
+  const url = await generateImage(heroImagePrompt(biz, content, typeLabel), "hero");
   if (!url) return null;
   await q(
     `insert into jhalak.site_content (business_id, content)
@@ -70,8 +77,9 @@ export async function generateAndSaveHero(
 export async function generateProductImage(
   bizId: string,
   item: { title: string; description?: string; category?: string },
-  biz: BusinessBasics
+  biz: BusinessBasics,
+  cap?: number
 ): Promise<string | null> {
-  if (!(await reserveGeneration(bizId))) return null;
+  if (!(await reserveGeneration(bizId, cap))) return null;
   return generateImage(productImagePrompt(item, biz), "square");
 }

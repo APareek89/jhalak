@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import ProductThumb from "../ProductThumb";
 
 type P = {
   id: string; title: string; description: string; category: string;
@@ -60,9 +61,8 @@ export default function ProductsBrowser({
             <button key={p.id} onClick={() => setOpen(p)}
               className={`text-left rounded-2xl overflow-hidden ${card} group cursor-pointer`}>
               <div className="relative">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={p.image} alt={p.title}
-                  className="aspect-square object-cover w-full group-hover:scale-[1.02] transition" />
+                <ProductThumb src={p.image} title={p.title}
+                  className="aspect-square w-full group-hover:scale-[1.02] transition" />
                 {p.discount_pct > 0 && (
                   <span className="absolute top-3 left-3 rounded-full bg-rose-600 text-white text-xs font-bold px-2.5 py-1">
                     {p.discount_pct}% OFF
@@ -97,8 +97,7 @@ export default function ProductsBrowser({
           onClick={() => setOpen(null)}>
           <div className="bg-white text-stone-900 rounded-t-3xl sm:rounded-3xl w-full max-w-2xl max-h-[92vh] overflow-y-auto"
             onClick={(e) => e.stopPropagation()}>
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={open.image} alt={open.title} className="w-full aspect-square sm:aspect-video object-cover" />
+            <ProductThumb src={open.image} title={open.title} className="w-full aspect-square sm:aspect-video" />
             <div className="p-6 space-y-3">
               <div className="flex items-start justify-between gap-4">
                 <div>

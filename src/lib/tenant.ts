@@ -60,6 +60,7 @@ export type Content = {
   reference_text?: string; reference_source?: string;
   hero_image_url?: string;                        // generated/uploaded hero (v6)
   sections?: Section[];                           // rich ordered blocks (v6)
+  business_type?: string;                         // readable descriptor (import) — eyebrow fallback
 };
 
 /** True when a section has something worth rendering (avoids empty blocks). */

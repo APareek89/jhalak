@@ -12,6 +12,7 @@ import { fetchJson, downscaleImage } from "@/lib/client";
 import SmartTextarea from "@/components/SmartTextarea";
 import AppShell from "@/components/AppShell";
 import ShowcaseCarousel from "@/components/ShowcaseCarousel";
+import ImportFlow from "./ImportFlow";
 import { LayoutDashboard, Package, Clapperboard, Inbox, Wand2 } from "lucide-react";
 
 type SiteCopy = {
@@ -128,6 +129,7 @@ const TEMPLATES = [
 
 export default function StartWizard() {
   const router = useRouter();
+  const [path, setPath] = useState<"choose" | "fresh" | "import">("choose");
   const [step, setStep] = useState(1);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -353,9 +355,37 @@ export default function StartWizard() {
     <AppShell
       items={shellItems}
       userName={me?.user?.name || undefined}
-      breadcrumb={<span>Create website <span className="mx-1 text-slate-300">›</span> <b className="text-slate-800">Step {step} of 5</b> — {stepTitle}</span>}
+      breadcrumb={
+        path === "fresh"
+          ? <span>Create website <span className="mx-1 text-slate-300">›</span> <b className="text-slate-800">Step {step} of 5</b> — {stepTitle}</span>
+          : path === "import"
+          ? <span>Create website <span className="mx-1 text-slate-300">›</span> <b className="text-slate-800">Import your existing site</b></span>
+          : <span><b className="text-slate-800">Create your website</b></span>
+      }
     >
       <div className="px-4 sm:px-6 py-6">
+        {path === "choose" && (
+          <div className="max-w-3xl mx-auto py-4">
+            <h1 className="text-2xl font-bold tracking-tight mb-1">Let&apos;s build your website</h1>
+            <p className="text-slate-500 text-sm mb-6">Two ways to start — pick whichever fits you.</p>
+            <div className="grid sm:grid-cols-2 gap-4">
+              <button onClick={() => setPath("fresh")}
+                className="card p-6 text-left hover:!border-blue-600 hover:ring-2 hover:ring-blue-600/15 transition cursor-pointer">
+                <Sparkles className="text-blue-600 mb-3" size={26} />
+                <h2 className="font-semibold text-lg mb-1">Start fresh</h2>
+                <p className="text-sm text-slate-500">Answer a few quick questions — you can speak them — and we&apos;ll write your site and catalogue from scratch.</p>
+              </button>
+              <button onClick={() => setPath("import")}
+                className="card p-6 text-left hover:!border-blue-600 hover:ring-2 hover:ring-blue-600/15 transition cursor-pointer">
+                <Globe className="text-blue-600 mb-3" size={26} />
+                <h2 className="font-semibold text-lg mb-1">I already have a website</h2>
+                <p className="text-sm text-slate-500">Paste your link — we&apos;ll read it, keep your real products, and rebuild it as a better, editable site with new images.</p>
+              </button>
+            </div>
+          </div>
+        )}
+        {path === "import" && <ImportFlow onBack={() => setPath("choose")} />}
+        {path === "fresh" && (<>
         <div className="h-1 bg-slate-200 rounded-full mb-6 max-w-3xl">
           <div className="h-1 bg-blue-600 rounded-full transition-all duration-500" style={{ width: `${(step / 5) * 100}%` }} />
         </div>
@@ -693,6 +723,7 @@ export default function StartWizard() {
           <ShowcaseCarousel onPick={pickStyle} current={`${template}-${accent}`} />
         </div>
         </div>
+        </>)}
       </div>
     </AppShell>
   );
