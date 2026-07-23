@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import Anthropic from "@anthropic-ai/sdk";
 import { q } from "@/lib/db";
 import { canManageBusiness } from "@/lib/auth";
 
@@ -13,6 +14,23 @@ function stripHtml(html: string): string {
     .replace(/&[a-z#0-9]+;/gi, " ")
     .replace(/\s+/g, " ")
     .trim();
+}
+
+/** JS-rendered sites (Wix, Hostinger Horizons, etc.) ship empty HTML shells —
+ *  reconstruct their content from the search index via Claude's web_search tool. */
+async function researchSiteViaWeb(url: string): Promise<string> {
+  const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+  const host = new URL(url).hostname.replace(/^www\./, "");
+  const res = await client.messages.create({
+    model: "claude-sonnet-4-6",
+    max_tokens: 1800,
+    tools: [{ type: "web_search_20250305", name: "web_search", max_uses: 3 } as unknown as Anthropic.Tool],
+    messages: [{
+      role: "user",
+      content: `Research the business behind the website ${url} (search "site:${host}" and the business name). Write a factual reference document covering: business name, what they offer (products/services with specifics), who they serve, unique strengths, locations/contact details, and their tone of voice. Plain text only, facts only — this will seed a new website for the same business.`,
+    }],
+  });
+  return res.content.filter((c) => c.type === "text").map((c) => (c as Anthropic.TextBlock).text).join("\n");
 }
 
 async function saveReference(bizId: string, text: string, source: string) {
@@ -49,11 +67,16 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string
         headers: { "User-Agent": "Mozilla/5.0 (compatible; JhalakBot/1.0)" },
         signal: AbortSignal.timeout(15_000),
       });
-      if (!r.ok) {
-        return NextResponse.json({ error: `That site returned ${r.status} — check the link.` }, { status: 400 });
+      let text = "";
+      let via = "url";
+      if (r.ok) text = stripHtml(await r.text());
+      // JS-rendered shell or blocked fetch → reconstruct from the web index
+      if (text.replace(/\s+/g, " ").trim().length < 200) {
+        text = await researchSiteViaWeb(url);
+        via = "web-research";
       }
-      const chars = await saveReference(id, stripHtml(await r.text()), url);
-      return NextResponse.json({ ok: true, chars, source: "url" });
+      const chars = await saveReference(id, text, url);
+      return NextResponse.json({ ok: true, chars, source: via });
     }
 
     // multipart: document upload (txt / md / pdf)
