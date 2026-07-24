@@ -8,7 +8,7 @@ export default function TenantHeader({
 }: {
   slug: string; name: string; logo?: string; displayClass: string; headerClass: string;
   accentBg: string; wa: string;
-  items: { href: string; label: string }[];
+  items: { href: string; label: string; key: string }[];
 }) {
   const path = usePathname();
   const base = `/s/${slug}`;
@@ -29,6 +29,8 @@ export default function TenantHeader({
               <Link
                 key={i.href + i.label}
                 href={i.href}
+                data-sel={`tab:${i.key}`}
+                data-sel-label={`${i.label} tab`}
                 className={`shrink-0 px-3 py-1.5 rounded-full text-sm transition ${
                   active ? "font-semibold underline underline-offset-8" : "opacity-75 hover:opacity-100"
                 }`}

@@ -23,7 +23,8 @@ export default function Sections({
   return (
     <>
       {sections.map((s) => {
-        const marker = { "data-section": s.id, "data-section-type": s.type } as Record<string, unknown>;
+        const label = ({ stats: "Stats strip", industries: "Industries", testimonials: "Testimonials", certifications: "Certifications", cta_banner: "CTA banner" } as Record<string, string>)[s.type] || s.type;
+        const marker = { "data-sel": `section:${s.id}`, "data-sel-label": label } as Record<string, unknown>;
 
         if (s.type === "stats") {
           // static classes only — Tailwind JIT can't see runtime-built class strings

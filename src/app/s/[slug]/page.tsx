@@ -74,12 +74,12 @@ export default async function Site({
             {eyebrow && (
               <p className={`text-xs uppercase tracking-[0.25em] mb-4 ${t.accentText}`}>{eyebrow}</p>
             )}
-            <h1 data-edit="headline" className={`${t.display} text-4xl sm:text-5xl leading-tight`}>
+            <h1 data-sel="headline" data-sel-label="Headline" data-edit="headline" className={`${t.display} text-4xl sm:text-5xl leading-tight`}>
               {content.headline || biz.name}
             </h1>
-            {content.tagline && <p data-edit="tagline" className="mt-4 text-lg opacity-80">{content.tagline}</p>}
+            {content.tagline && <p data-sel="tagline" data-sel-label="Tagline" data-edit="tagline" className="mt-4 text-lg opacity-80">{content.tagline}</p>}
             <div className="mt-8 flex gap-3">
-              <a href={contactHref} data-edit="cta_label" className={`rounded-full ${t.accentBg} text-white px-7 py-3.5 font-semibold transition`}>
+              <a href={contactHref} data-sel="cta" data-sel-label="Button" data-edit="cta_label" className={`rounded-full ${t.accentBg} text-white px-7 py-3.5 font-semibold transition`}>
                 {content.cta_label || "Get in touch"}
               </a>
               {biz.phone && (
@@ -91,7 +91,7 @@ export default async function Site({
           </div>
           {heroImg && (
             // eslint-disable-next-line @next/next/no-img-element
-            <img src={heroImg} data-edit="hero_image" alt={biz.name} className="rounded-3xl aspect-square object-cover w-full shadow-2xl" />
+            <img src={heroImg} data-sel="hero-image" data-sel-label="Hero image" alt={biz.name} className="rounded-3xl aspect-square object-cover w-full shadow-2xl" />
           )}
         </div>
       </section>
@@ -100,19 +100,19 @@ export default async function Site({
       <Sections sections={statsSections} t={t} wa={wa} contactHref={contactHref} />
 
       {tabs.about && content.about && (
-        <section data-section="about" className="max-w-5xl mx-auto px-6 py-16">
+        <section className="max-w-5xl mx-auto px-6 py-16">
           <h2 className={`${t.display} text-2xl mb-4`}>About us</h2>
-          <p data-edit="about" className="max-w-2xl text-lg leading-8 opacity-80">{content.about}</p>
+          <p data-sel="about" data-sel-label="About text" data-edit="about" className="max-w-2xl text-lg leading-8 opacity-80">{content.about}</p>
         </section>
       )}
 
       {!!content.services?.length && (
-        <section data-section="services" className={t.sectionAlt}>
+        <section className={t.sectionAlt}>
           <div className="max-w-5xl mx-auto px-6 py-16">
             <h2 className={`${t.display} text-2xl mb-8`}>What we do</h2>
             <div className="grid sm:grid-cols-3 gap-6">
               {content.services.map((s, i) => (
-                <div key={i} className={`rounded-2xl p-6 ${t.card}`}>
+                <div key={i} data-sel={`service:${i}`} data-sel-label={`Service ${i + 1}`} className={`rounded-2xl p-6 ${t.card}`}>
                   <h3 data-edit={`service:${i}:title`} className="font-semibold mb-2">{s.title}</h3>
                   <p data-edit={`service:${i}:desc`} className="text-sm opacity-70 leading-6">{s.desc}</p>
                 </div>
@@ -123,7 +123,7 @@ export default async function Site({
       )}
 
       {tabs.products && !!featured.length && (
-        <section data-section="products" className="max-w-5xl mx-auto px-6 py-16">
+        <section className="max-w-5xl mx-auto px-6 py-16">
           <div className="flex items-baseline justify-between mb-8">
             <h2 className={`${t.display} text-2xl`}>{isService ? "Our work" : "Featured"}</h2>
             <Link href={`/s/${slug}/products`} className={`text-sm font-semibold ${t.accentText}`}>
@@ -134,7 +134,7 @@ export default async function Site({
             {featured.map((p) => {
               const price = discounted(p.price_text, p.discount_pct);
               return (
-                <Link key={p.id} href={`/s/${slug}/products`} className={`rounded-2xl overflow-hidden ${t.card} group`}>
+                <Link key={p.id} href={`/s/${slug}/products`} data-sel={`product:${p.id}`} data-sel-label={`${p.title || "Product"}`} className={`rounded-2xl overflow-hidden ${t.card} group`}>
                   <div className="relative">
                     <ProductThumb src={p.processed_url || p.original_url} title={p.title}
                       className="aspect-square w-full group-hover:scale-[1.02] transition" />

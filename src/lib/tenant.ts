@@ -206,13 +206,13 @@ export function discounted(priceText: string, discountPct: number): { original: 
 /** Header items for the tenant site nav, given resolved tabs + product count. */
 export function navItems(slug: string, content: Content, productCount: number) {
   const base = `/s/${slug}`;
-  const items: { href: string; label: string }[] = [{ href: base, label: "Home" }];
+  const items: { href: string; label: string; key: string }[] = [{ href: base, label: "Home", key: "home" }];
   for (const t of enabledTabs(content)) {
     if (t.key === "about") continue; // rendered as a home section
-    if (t.key === "products") { if (productCount) items.push({ href: `${base}/products`, label: t.label }); continue; }
-    if (t.key === "gallery") { if (productCount) items.push({ href: `${base}/gallery`, label: t.label }); continue; }
-    if (t.key === "contact") { items.push({ href: `${base}#contact`, label: t.label }); continue; }
-    items.push({ href: `${base}/t/${t.key}`, label: t.label }); // text tabs (pricing/terms/faq/custom)
+    if (t.key === "products") { if (productCount) items.push({ href: `${base}/products`, label: t.label, key: t.key }); continue; }
+    if (t.key === "gallery") { if (productCount) items.push({ href: `${base}/gallery`, label: t.label, key: t.key }); continue; }
+    if (t.key === "contact") { items.push({ href: `${base}#contact`, label: t.label, key: t.key }); continue; }
+    items.push({ href: `${base}/t/${t.key}`, label: t.label, key: t.key }); // text tabs (pricing/terms/faq/custom)
   }
   return items;
 }

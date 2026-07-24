@@ -26,17 +26,11 @@ export default function Studio({ params }: { params: Promise<{ id: string }> }) 
   const [version, setVersion] = useState(1);
   const [published, setPublished] = useState(false);
   const [mobileView, setMobileView] = useState<"chat" | "preview">("chat");
-  const [selected, setSelected] = useState<{ section: string; sectionType: string } | null>(null);
+  const [selected, setSelected] = useState<{ sel: string; label: string } | null>(null);
   const [savedFlash, setSavedFlash] = useState("");
   const [flashErr, setFlashErr] = useState(false);
   const chatEnd = useRef<HTMLDivElement>(null);
   const iframeRef = useRef<HTMLIFrameElement>(null);
-
-  const SECTION_LABELS: Record<string, string> = {
-    hero: "Hero", about: "About", services: "What we do", products: "Products",
-    stats: "Stats", industries: "Industries", testimonials: "Testimonials",
-    certifications: "Certifications", cta_banner: "CTA banner", cta: "CTA banner",
-  };
 
   const load = useCallback(async () => {
     const r = await fetchJson<{ business: { slug: string; status: string; name: string } }>(`/api/business/${id}`);
@@ -58,7 +52,7 @@ export default function Studio({ params }: { params: Promise<{ id: string }> }) 
       const d = e.data;
       if (!d || !d.__jhalak) return;
       if (d.type === "select") {
-        setSelected({ section: String(d.section || ""), sectionType: String(d.sectionType || "") });
+        setSelected({ sel: String(d.sel || ""), label: String(d.label || "") });
         setMobileView("chat");
       } else if (d.type === "edit" && typeof d.path === "string") {
         const r = await fetchJson(`/api/business/${id}/field`, {
@@ -170,12 +164,12 @@ export default function Studio({ params }: { params: Promise<{ id: string }> }) 
             {!messages.length && (
               <div className="space-y-4">
                 <p className="text-sm text-slate-600 leading-6">
-                  👋 This is your <b>website editor</b>. Two ways to edit:
+                  👋 This is your <b>website editor</b>. Three ways to change things:
                 </p>
                 <ul className="text-sm text-slate-600 leading-6 list-disc pl-5 space-y-1">
-                  <li><b>Click any text</b> in the preview to retype it.</li>
-                  <li><b>Click a section</b> (like the hero), then tell me what to change — e.g. “make the image more industrial, blue tones”.</li>
-                  <li>Or just type a change below.</li>
+                  <li><b>Click any part</b> of your site — text, button, image, tab or section — then tell me what to change (e.g. “make this image more industrial, blue tones”).</li>
+                  <li><b>Double-click text</b> to retype it directly.</li>
+                  <li>Or just type — like “add a testimonials section” or “add a Pricing tab”.</li>
                 </ul>
                 <div className="space-y-2">
                   {SUGGESTIONS.map((s) => (
@@ -218,7 +212,7 @@ export default function Studio({ params }: { params: Promise<{ id: string }> }) 
               <div className="mb-2 flex items-center gap-2 flex-wrap">
                 {selected && (
                   <span className="inline-flex items-center gap-1.5 text-xs font-medium bg-blue-100 text-blue-800 rounded-full pl-3 pr-2 py-1">
-                    ✏️ Editing: {SECTION_LABELS[selected.section] || selected.section}
+                    ✏️ Editing: {selected.label || selected.sel}
                     <button onClick={clearSelection} aria-label="Clear selection" className="text-blue-500 hover:text-blue-900 text-sm leading-none">×</button>
                   </span>
                 )}
@@ -231,7 +225,7 @@ export default function Studio({ params }: { params: Promise<{ id: string }> }) 
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
                 onKeyDown={(e) => e.key === "Enter" && send()}
-                placeholder={selected ? `Editing ${SECTION_LABELS[selected.section] || selected.section} — e.g. "make this shorter"` : "e.g. Make the headline about bridal wear…"}
+                placeholder={selected ? `Editing ${selected.label || selected.sel} — e.g. "make this shorter"` : "e.g. Make the headline about bridal wear…"}
                 disabled={busy}
                 className="flex-1 border border-slate-300 rounded-full px-4 py-2.5 text-sm outline-none focus:border-blue-600 disabled:opacity-50"
               />
