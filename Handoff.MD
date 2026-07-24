@@ -4,7 +4,7 @@
 > Session rules: update this file before every checkpoint commit & at phase end (snapshot,
 > not journal); re-stamp `last-synced`; over ~40 lines → collapse ✅ into one "Shipped:" line.
 
-last-synced: c599267
+last-synced: 52e3fc4
 
 ## Current state
 - ✅ Shipped v1–v5 (2026-07-22): live at https://jhalak-p178.onrender.com — signup/login +
@@ -22,8 +22,11 @@ last-synced: c599267
      `gens_used` cap 8/create via quota.reserve/releaseGeneration; strictly sequential = OOM-safe).
   3. **Rich sections[]** typed blocks (stats/industries/testimonials/certifications/cta_banner) —
      tenant.ts + s/[slug]/Sections.tsx, across all templates, toggleable/ordered.
-  4. **Studio visual editing**: `?edit=1` inline text (EditBridge + /field merge endpoint) +
-     section-scoped chat (chip) + assistant tools update_section/toggle_section/regenerate_image.
+  4. **Studio visual editing**: `?edit=1` — **click-to-select ANY block** (data-sel on
+     text/cta/tab/hero-image/product/section) → hover label + chip → next prompt scoped to
+     it; double-click text = inline edit; free-chat still works. Assistant maps the
+     selection to the right tool; images now just regenerate (no false "can't generate");
+     add/rename tabs (set_tabs/add_tab/rename_tab) + add sections (update_section upserts).
   5. **FMEA pass** (13 adversarially-verified findings fixed): P0 SSRF guard + P0 streamed
      byte-cap (reference.ts), P0 gallery broken-img, P1 inline-edit-loss/budget-refund/apply-txn/
      building-hang, P2 postMessage-origin/placeholder-scrub/discount-badge; mobile studio header.
